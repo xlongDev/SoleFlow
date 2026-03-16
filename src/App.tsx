@@ -12,7 +12,7 @@ function App() {
   return (
     <>
       <Toaster position="top-center" richColors />
-      <BrowserRouter>
+      <BrowserRouter basename="/SoleFlow">
         <Routes>
           <Route element={<DashboardLayout />}>
             <Route path="/" element={<Dashboard />} />
