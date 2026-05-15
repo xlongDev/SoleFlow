@@ -1,6 +1,6 @@
-import { Hexagon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConfigStore } from "@/store/useConfigStore";
+import { SiteMark } from "@/components/SiteMark";
 
 export function Logo({ className, hideText = false }: { className?: string, hideText?: boolean }) {
     const { logo, brandName } = useConfigStore()
@@ -16,7 +16,7 @@ export function Logo({ className, hideText = false }: { className?: string, hide
                 {logo ? (
                     <img src={logo} alt="Logo" className="w-full h-full object-cover" />
                 ) : (
-                    <Hexagon size={24} className="fill-white/20 stroke-[3px]" />
+                    <SiteMark className="w-7 h-7 text-white/90" />
                 )}
             </div>
             {!hideText && (

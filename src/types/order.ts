@@ -10,6 +10,8 @@ export interface OrderItem {
     costPrice: number;
     quantity: number;
     category?: ItemCategory;
+    isRefunded?: boolean;
+    refundReason?: string;
 }
 
 export interface Order {

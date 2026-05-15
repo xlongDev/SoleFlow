@@ -1,5 +1,19 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { safePersistJSONStorage } from '@/lib/safePersistStorage'
+import type { SupplierAftercare } from '@/types/supplier'
+import { emptySupplierAftercare } from '@/types/supplier'
+
+function buildAftercareMap(suppliers: string[], existing: Record<string, SupplierAftercare> = {}) {
+    const next: Record<string, SupplierAftercare> = { ...existing }
+    suppliers.forEach((name) => {
+        if (!next[name]) next[name] = emptySupplierAftercare()
+    })
+    Object.keys(next).forEach((key) => {
+        if (!suppliers.includes(key)) delete next[key]
+    })
+    return next
+}
 
 interface ConfigStore {
     logo: string | null;
@@ -11,6 +25,10 @@ interface ConfigStore {
     darkCardBg: string;
     accentColor: string;
     suppliers: string[];
+    supplierAftercare: Record<string, SupplierAftercare>;
+    imageCompressionEnabled: boolean;
+    imageCompressionQuality: number;
+    maxImageWidth: number;
     setLogo: (logo: string | null) => void;
     setPrimaryColor: (color: string) => void;
     setBrandName: (name: string) => void;
@@ -20,6 +38,10 @@ interface ConfigStore {
     setDarkCardBg: (color: string) => void;
     setAccentColor: (color: string) => void;
     setSuppliers: (suppliers: string[]) => void;
+    updateSupplierAftercare: (supplierName: string, patch: Partial<SupplierAftercare>) => void;
+    setImageCompressionEnabled: (enabled: boolean) => void;
+    setImageCompressionQuality: (quality: number) => void;
+    setMaxImageWidth: (width: number) => void;
     exportSettings: () => string;
     importSettings: (jsonString: string) => boolean;
     resetToDefault: () => void;
@@ -37,6 +59,12 @@ export const useConfigStore = create<ConfigStore>()(
             darkCardBg: '#1e293b',
             accentColor: '#8b5cf6',
             suppliers: ['Default Supplier'],
+            supplierAftercare: {
+                'Default Supplier': emptySupplierAftercare()
+            },
+            imageCompressionEnabled: true,
+            imageCompressionQuality: 0.8,
+            maxImageWidth: 1280,
 
             setLogo: (logo) => set({ logo }),
             setPrimaryColor: (color) => {
@@ -64,7 +92,23 @@ export const useConfigStore = create<ConfigStore>()(
                 set({ accentColor: color });
                 document.documentElement.style.setProperty('--accent-color', color);
             },
-            setSuppliers: (suppliers) => set({ suppliers }),
+            setSuppliers: (suppliers) => set((state) => ({
+                suppliers,
+                supplierAftercare: buildAftercareMap(suppliers, state.supplierAftercare)
+            })),
+            updateSupplierAftercare: (supplierName, patch) => set((state) => ({
+                supplierAftercare: {
+                    ...state.supplierAftercare,
+                    [supplierName]: {
+                        ...emptySupplierAftercare(),
+                        ...state.supplierAftercare[supplierName],
+                        ...patch
+                    }
+                }
+            })),
+            setImageCompressionEnabled: (enabled) => set({ imageCompressionEnabled: enabled }),
+            setImageCompressionQuality: (quality) => set({ imageCompressionQuality: quality }),
+            setMaxImageWidth: (width) => set({ maxImageWidth: width }),
 
             exportSettings: () => {
                 const state = get();
@@ -78,6 +122,10 @@ export const useConfigStore = create<ConfigStore>()(
                     darkCardBg: state.darkCardBg,
                     accentColor: state.accentColor,
                     suppliers: state.suppliers,
+                    supplierAftercare: state.supplierAftercare,
+                    imageCompressionEnabled: state.imageCompressionEnabled,
+                    imageCompressionQuality: state.imageCompressionQuality,
+                    maxImageWidth: state.maxImageWidth,
                     exportDate: new Date().toISOString()
                 };
                 return JSON.stringify(settings, null, 2);
@@ -95,6 +143,17 @@ export const useConfigStore = create<ConfigStore>()(
                     }
                     if (settings.brandName) newState.brandName = settings.brandName;
                     if (settings.suppliers) newState.suppliers = settings.suppliers;
+                    if (settings.supplierAftercare && typeof settings.supplierAftercare === 'object') {
+                        newState.supplierAftercare = buildAftercareMap(
+                            settings.suppliers || get().suppliers,
+                            settings.supplierAftercare
+                        );
+                    } else if (settings.suppliers) {
+                        newState.supplierAftercare = buildAftercareMap(settings.suppliers, get().supplierAftercare);
+                    }
+                    if (settings.imageCompressionEnabled !== undefined) newState.imageCompressionEnabled = settings.imageCompressionEnabled;
+                    if (settings.imageCompressionQuality !== undefined) newState.imageCompressionQuality = settings.imageCompressionQuality;
+                    if (settings.maxImageWidth !== undefined) newState.maxImageWidth = settings.maxImageWidth;
 
                     if (settings.lightBgColor) {
                         newState.lightBgColor = settings.lightBgColor;
@@ -136,6 +195,10 @@ export const useConfigStore = create<ConfigStore>()(
                     darkCardBg: '#1e293b',
                     accentColor: '#8b5cf6',
                     suppliers: ['Default Supplier'],
+                    supplierAftercare: { 'Default Supplier': emptySupplierAftercare() },
+                    imageCompressionEnabled: true,
+                    imageCompressionQuality: 0.8,
+                    maxImageWidth: 1280,
                 };
                 set(defaults);
                 document.documentElement.style.setProperty('--primary-color', defaults.primaryColor);
@@ -148,6 +211,22 @@ export const useConfigStore = create<ConfigStore>()(
         }),
         {
             name: 'config-storage',
+            storage: safePersistJSONStorage,
+            version: 2,
+            migrate: (persistedState: any, version: number) => {
+                if (!persistedState) return persistedState
+                if (version < 2) {
+                    const suppliers: string[] = Array.isArray(persistedState.suppliers)
+                        ? persistedState.suppliers
+                        : ['Default Supplier']
+                    return {
+                        ...persistedState,
+                        suppliers,
+                        supplierAftercare: buildAftercareMap(suppliers, persistedState.supplierAftercare)
+                    }
+                }
+                return persistedState
+            },
             onRehydrateStorage: () => (state) => {
                 if (state) {
                     if (state.primaryColor) document.documentElement.style.setProperty('--primary-color', state.primaryColor);

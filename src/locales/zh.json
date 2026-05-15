@@ -53,7 +53,18 @@
         "view": "预览",
         "editTitle": "编辑订单",
         "editSubtitle": "修改订单发货详情。",
-        "size": "尺码"
+        "size": "尺码",
+        "refund": "退款",
+        "refunded": "已退款",
+        "refundReason": "退款原因",
+        "refundReasons": {
+            "size_issue": "尺码不合",
+            "out_of_stock": "商品缺货",
+            "quality_issue": "质量问题",
+            "customer_change": "客户改主意",
+            "shipping_delay": "发货延迟",
+            "other": "其他"
+        }
     },
     "newOrder": {
         "title": "新建订单",
@@ -140,6 +151,12 @@
         "posterStyleBlueprint": "蓝图指引",
         "brandName": "品牌名称",
         "brandNamePlaceholder": "输入您的品牌名称",
+        "imageSettings": "图片设置",
+        "imageCompression": "自动压缩图片",
+        "imageCompressionDesc": "上传图片时自动进行压缩以节省空间。",
+        "compressionQuality": "压缩质量",
+        "maxImageWidth": "最大宽度 (像素)",
+        "excludeRefunded": "导出时不包含已退款商品",
         "settingsManagement": "设置管理",
         "exportSettings": "导出设置",
         "importSettings": "导入设置",
@@ -190,6 +207,8 @@
         "profitMargin": "平均利润率",
         "salesTrends": "销售趋势",
         "revenueTrends": "月度营收分析",
-        "marketingAnalysis": "当日营销分析"
+        "marketingAnalysis": "当日营销分析",
+        "yearlyMarketingAnalysis": "年度营销分析",
+        "monthlyMarketingAnalysis": "月度营销分析"
     }
 }

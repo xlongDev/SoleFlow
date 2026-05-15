@@ -40,7 +40,10 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
     const { i18n } = useTranslation()
     const isChinese = i18n.language.startsWith('zh')
     const style = config.style || 'classic'
-    const displayShoeName = config.shoeNameOverride || order.items[0]?.name || ''
+    const activeItems = order.items.filter(item => !item.isRefunded)
+    if (activeItems.length === 0) return null
+
+    const displayShoeName = config.shoeNameOverride || activeItems[0]?.name || ''
     const primaryColor = config.primaryColor || '#000000'
     const bgColor = config.backgroundColor || '#ffffff'
     const textColor = config.textColor || '#000000'
@@ -125,7 +128,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             </div>
 
             <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide space-y-12 py-4">
-                {order.items.map((item, idx) => (
+                {activeItems.map((item, idx) => (
                     <div key={idx} className="relative group">
                         <div className="flex items-center gap-8">
                             <div className="w-1/2 aspect-video bg-gradient-to-tr from-white/5 to-transparent rounded-3xl p-4 relative overflow-hidden flex items-center justify-center">
@@ -196,7 +199,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             </div>
 
             <div className="flex-1 py-12 space-y-16 overflow-y-auto scrollbar-hide">
-                {order.items.map((item, idx) => (
+                {activeItems.map((item, idx) => (
                     <div key={idx} className="grid grid-cols-2 gap-12 items-center">
                         <div className="relative">
                             <div className="aspect-square bg-white/5 rounded-full blur-[100px] absolute inset-0" />
@@ -255,7 +258,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             </div>
 
             <div className="flex-1 grid grid-cols-2 gap-12 px-4 overflow-y-auto scrollbar-hide py-4">
-                {order.items.map((item, idx) => (
+                {activeItems.map((item, idx) => (
                     <div key={idx} className="space-y-6">
                         <div className="aspect-square bg-slate-50 rounded-[2.5rem] flex items-center justify-center p-8 border border-slate-100">
                             {item.image && (
@@ -324,7 +327,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     <div className="col-span-2 text-center">SIZE</div>
                     <div className="col-span-4 text-right">AMOUNT</div>
                 </div>
-                {order.items.map((item, idx) => (
+                {activeItems.map((item, idx) => (
                     <div key={idx} className="space-y-2">
                         <div className="grid grid-cols-12">
                             <div className="col-span-6 font-bold">{config.showShoeName ? item.name : '---'}</div>
@@ -379,7 +382,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                 <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-primary/10 blur-[100px] rounded-full" style={{ backgroundColor: primaryColor, opacity: 0.1 }} />
             </div>
 
-            <div className={`relative z-10 flex flex-col h-full ${order.items.length === 1 ? 'justify-between' : ''}`}>
+            <div className={`relative z-10 flex flex-col h-full ${activeItems.length === 1 ? 'justify-between' : ''}`}>
                 <div className="flex justify-between items-center mb-8">
                     {!brandName && !brandLogo && <Logo className="scale-125" />}
                     <div className="text-right">
@@ -388,9 +391,9 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     </div>
                 </div>
 
-                <div className={`overflow-y-auto scrollbar-hide py-2 space-y-6 ${order.items.length === 1 ? 'flex-1 flex items-center' : 'flex-1'}`}>
-                    <div className={order.items.length === 1 ? 'w-full' : ''}>
-                        {order.items.map((item, idx) => (
+                <div className={`overflow-y-auto scrollbar-hide py-2 space-y-6 ${activeItems.length === 1 ? 'flex-1 flex items-center' : 'flex-1'}`}>
+                    <div className={activeItems.length === 1 ? 'w-full' : ''}>
+                        {activeItems.map((item, idx) => (
                             <div key={idx} className="bg-white/60 backdrop-blur-md rounded-[2rem] border border-white p-6 flex gap-6 items-center shadow-sm mb-6 last:mb-0">
                                 <div className="w-32 h-24 flex items-center justify-center">
                                     {item.image && (
@@ -464,7 +467,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             </div>
 
             <div className="flex-1 overflow-y-auto scrollbar-hide py-4 px-4 space-y-16">
-                {order.items.map((item, idx) => (
+                {activeItems.map((item, idx) => (
                     <div key={idx} className="grid grid-cols-12 gap-12 items-center">
                         <div className="col-span-5 relative">
                             <div className="aspect-square bg-slate-50 rounded-2xl p-4 flex items-center justify-center border border-slate-100">
@@ -539,7 +542,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                 </div>
 
                 <div className="flex-1 flex flex-col justify-center items-center relative">
-                    {order.items.map((item, idx) => (
+                    {activeItems.map((item, idx) => (
                         <div key={idx} className="relative w-full max-w-lg">
                             <div className="absolute inset-0 border border-current opacity-10 rounded-[50%_40%_30%_70%/60%_30%_70%_40%] animate-[spin_20s_linear_infinite]" />
                             <div className="relative z-10 p-8">
@@ -593,7 +596,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     <p className="font-mono text-sm">{format(new Date(), 'dd.MM.yyyy')}</p>
                 </div>
 
-                {order.items.map((item, idx) => (
+                {activeItems.map((item, idx) => (
                     <div key={idx} className="flex-1 flex flex-col relative">
                         {config.showShoeName && (
                             <h2 className="text-8xl font-black leading-[0.8] uppercase tracking-tight break-all z-10 relative mix-blend-difference text-white" style={{ transform: `scale(${fontScale})`, transformOrigin: 'top left', color: '#fff', mixBlendMode: 'difference' }}>
@@ -651,7 +654,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     <Logo className="w-8 h-8" />
                 </div>
 
-                {order.items.map((item, idx) => (
+                {activeItems.map((item, idx) => (
                     <div key={idx} className="flex-1 flex flex-col items-center justify-center relative">
                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-3xl" />
 
@@ -681,12 +684,12 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     </div>
                     <div>
                         <p className="text-white/40 text-xs font-bold uppercase mb-1">Size</p>
-                        <p className="font-bold">{order.items[0]?.size}</p>
+                        <p className="font-bold">{activeItems[0]?.size}</p>
                     </div>
                     {config.showPrice && (
                         <div>
                             <p className="text-white/40 text-xs font-bold uppercase mb-1">Price</p>
-                            <p className="font-bold">¥{order.items[0]?.price}</p>
+                            <p className="font-bold">¥{activeItems[0]?.price}</p>
                         </div>
                     )}
                     <div className="flex items-center justify-end">
@@ -716,12 +719,12 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                 <div className="absolute scale-[2] opacity-5 text-white whitespace-nowrap overflow-hidden select-none select-none">
                     STREET CULTURE STREET CULTURE STREET CULTURE
                 </div>
-                {order.items[0]?.image && (
+                {activeItems[0]?.image && (
                     <div className="relative group">
                         <div className="absolute inset-0 bg-primary blur-3xl opacity-20 group-hover:opacity-40 transition-opacity" style={{ backgroundColor: primaryColor !== '#000000' ? primaryColor : undefined }} />
-                        {order.items[0]?.image && (
+                        {activeItems[0]?.image && (
                             <img
-                                src={order.items[0].image}
+                                src={activeItems[0].image}
                                 className="w-full relative z-10 drop-shadow-[0_20px_50px_rgba(255,255,255,0.1)]"
                                 style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
                             />
@@ -758,9 +761,9 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             </div>
             <div className="flex-1 flex items-center justify-center py-4">
                 <div className="relative w-full aspect-video bg-[#4a342e]/5 rounded-sm p-8 outline outline-1 outline-offset-4 outline-[#4a342e]/20" style={{ outlineColor: primaryColor !== '#000000' ? `${primaryColor}33` : undefined, backgroundColor: primaryColor !== '#000000' ? `${primaryColor}0D` : undefined }}>
-                    {order.items[0]?.image && (
+                    {activeItems[0]?.image && (
                         <img
-                            src={order.items[0].image}
+                            src={activeItems[0].image}
                             className="w-full h-full object-contain sepia-[0.3] contrast-[1.1]"
                             style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
                         />
@@ -784,7 +787,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     {config.showPrice && <div className="text-4xl font-black italic border-x-4 border-[#4a342e] px-6 py-2 shrink-0" style={{ borderColor: primaryColor !== '#000000' ? primaryColor : undefined }}>¥{order.totalAmount.toLocaleString()}</div>}
                     <div className="text-center flex-1">
                         <p className="text-[10px] font-sans font-black uppercase tracking-widest opacity-40">Size</p>
-                        <p className="text-lg font-bold">{['clothes', 'pants'].includes(order.items[0]?.category || '') ? order.items[0]?.size : `${order.items[0]?.size} EUR`}</p>
+                        <p className="text-lg font-bold">{['clothes', 'pants'].includes(activeItems[0]?.category || '') ? activeItems[0]?.size : `${activeItems[0]?.size} EUR`}</p>
                         {config.showTracking && <p className="text-[10px] font-mono opacity-60 mt-2">{getTrackingDisplay()}</p>}
                     </div>
                 </div>
@@ -807,9 +810,9 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             </div>
             <div className="flex-1 flex gap-12 py-12 items-center">
                 <div className="w-1/2 aspect-square bg-white rounded-3xl shadow-2xl p-8 flex items-center justify-center border border-slate-100">
-                    {order.items[0]?.image && (
+                    {activeItems[0]?.image && (
                         <img
-                            src={order.items[0].image}
+                            src={activeItems[0].image}
                             className="w-full h-full object-contain"
                             style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
                         />
@@ -823,12 +826,12 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     <div className="grid grid-cols-2 gap-8 border-t border-slate-100 pt-8">
                         <div>
                             <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">Specifications</p>
-                            <p className="text-lg font-bold">Size {['clothes', 'pants'].includes(order.items[0]?.category || '') ? order.items[0]?.size : `${order.items[0]?.size} EUR`}</p>
+                            <p className="text-lg font-bold">Size {['clothes', 'pants'].includes(activeItems[0]?.category || '') ? activeItems[0]?.size : `${activeItems[0]?.size} EUR`}</p>
                         </div>
                         {config.showPrice && (
                             <div>
                                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">Unit Value</p>
-                                <p className="text-lg font-bold">¥ {order.items[0]?.price.toLocaleString()}</p>
+                                <p className="text-lg font-bold">¥ {activeItems[0]?.price.toLocaleString()}</p>
                             </div>
                         )}
                     </div>
@@ -869,13 +872,22 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             <div className="flex-1 flex flex-col items-center justify-center py-12 gap-8">
                 <div className="relative w-full">
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[180px] font-black text-white/10 select-none whitespace-nowrap">ACTIVE WEAR</div>
-                    {order.items[0]?.image && (
-                        <img
-                            src={order.items[0].image}
-                            className="w-full relative z-10 drop-shadow-[0_35px_35px_rgba(0,0,0,0.4)] transform"
-                            style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
-                        />
-                    )}
+                    <div className="relative w-full aspect-square flex items-center justify-center">
+                        {activeItems.map((item, idx) => (
+                            item.image && (
+                                <img
+                                    key={idx}
+                                    src={item.image}
+                                    className="absolute w-full h-full object-contain drop-shadow-[0_35px_35px_rgba(0,0,0,0.4)] transition-all duration-500"
+                                    style={{ 
+                                        transform: `scale(${imgScale * (1 - idx * 0.1)}) rotate(${shoeRotation + (idx * 12)}deg) translate(${shoeX + (idx * 40)}px, ${shoeY + (idx * 40)}px)`,
+                                        zIndex: 10 - idx,
+                                        opacity: idx === 0 ? 1 : 0.7
+                                    }}
+                                />
+                            )
+                        ))}
+                    </div>
                 </div>
                 <div className="bg-black text-white p-12 w-full rounded-[4rem] flex flex-col gap-8 shadow-2xl -rotate-2" style={{ transform: `scale(${fontScale})` }}>
                     <div className="flex justify-between items-start gap-8">
@@ -891,7 +903,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     <div className="grid grid-cols-3 gap-8 border-t border-white/10 pt-8">
                         <div>
                             <p className="text-white/40 text-[10px] font-bold uppercase mb-1">Standard Size</p>
-                            <p className="text-2xl font-black">{['clothes', 'pants'].includes(order.items[0]?.category || '') ? order.items[0]?.size : `${order.items[0]?.size} EUR`}</p>
+                            <p className="text-2xl font-black">{['clothes', 'pants'].includes(activeItems[0]?.category || '') ? activeItems[0]?.size : `${activeItems[0]?.size} EUR`}</p>
                         </div>
                         <div className="col-span-2">
                             <p className="text-white/40 text-[10px] font-bold uppercase mb-1">Delivery Address</p>
@@ -932,13 +944,22 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             <div className="flex-1 flex gap-12 relative overflow-hidden">
                 <div className="w-2/3 relative">
                     <div className="absolute -top-12 -left-12 text-[200px] font-black text-white/5 pointer-events-none">SOLE</div>
-                    {order.items[0]?.image && (
-                        <img
-                            src={order.items[0].image}
-                            className="w-full relative z-10 filter contrast-125 saturate-125"
-                            style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
-                        />
-                    )}
+                    <div className="relative w-full aspect-square">
+                        {activeItems.map((item, idx) => (
+                            item.image && (
+                                <img
+                                    key={idx}
+                                    src={item.image}
+                                    className="absolute w-full h-full object-contain filter contrast-125 saturate-125 transition-all duration-500"
+                                    style={{ 
+                                        transform: `scale(${imgScale * (1 - idx * 0.08)}) rotate(${shoeRotation + (idx * -8)}deg) translate(${shoeX + (idx * 30)}px, ${shoeY + (idx * 30)}px)`,
+                                        zIndex: 10 - idx,
+                                        opacity: idx === 0 ? 1 : 0.6
+                                    }}
+                                />
+                            )
+                        ))}
+                    </div>
                     <div className="mt-12 space-y-4" style={{ transform: `scale(${fontScale})`, transformOrigin: 'top left' }}>
                         {config.showShoeName && <h2 className="text-4xl font-light tracking-tight text-white/90 border-b border-white/20 pb-4 italic">{displayShoeName}</h2>}
                         <div className="flex gap-12 text-[10px] tracking-widest uppercase font-bold text-slate-500">
@@ -957,7 +978,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                         </div>
                         <div>
                             <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-4" style={{ color: primaryColor !== '#000000' ? primaryColor : undefined }}>Specs</p>
-                            <p className="text-xl font-medium tracking-widest italic">{['clothes', 'pants'].includes(order.items[0]?.category || '') ? order.items[0]?.size : `${order.items[0]?.size} EUR`}</p>
+                            <p className="text-xl font-medium tracking-widest italic">{['clothes', 'pants'].includes(activeItems[0]?.category || '') ? activeItems[0]?.size : `${activeItems[0]?.size} EUR`}</p>
                             {config.showTracking && <p className="text-[10px] font-mono text-slate-500 mt-4 leading-relaxed">{getTrackingDisplay()}</p>}
                         </div>
                     </div>
@@ -999,13 +1020,22 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             <div className="flex-1 flex gap-8 my-8 relative">
                 <div className="w-2/3 border-2 border-cyan-400/30 rounded-2xl p-8 bg-cyan-950/20 backdrop-blur-md relative overflow-hidden" style={{ borderColor: primaryColor !== '#000000' ? `${primaryColor}4D` : undefined }}>
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,255,255,0.1),transparent_70%)]" style={{ backgroundImage: primaryColor !== '#000000' ? `radial-gradient(circle at center, ${primaryColor}1A, transparent 70%)` : undefined }} />
-                    {order.items[0]?.image && (
-                        <img
-                            src={order.items[0].image}
-                            className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_30px_rgba(34,211,238,0.4)]"
-                            style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
-                        />
-                    )}
+                    <div className="relative w-full h-full flex items-center justify-center">
+                        {activeItems.map((item, idx) => (
+                            item.image && (
+                                <img
+                                    key={idx}
+                                    src={item.image}
+                                    className="absolute w-[80%] h-[80%] object-contain relative z-10 drop-shadow-[0_0_30px_rgba(34,211,238,0.4)] transition-all duration-500"
+                                    style={{ 
+                                        transform: `scale(${imgScale * (1 - idx * 0.1)}) rotate(${shoeRotation + (idx * 5)}deg) translate(${shoeX + (idx * 20)}px, ${shoeY + (idx * 20)}px)`,
+                                        zIndex: 10 - idx,
+                                        opacity: idx === 0 ? 1 : 0.5
+                                    }}
+                                />
+                            )
+                        ))}
+                    </div>
                     <div className="absolute bottom-4 left-4 right-4 bg-cyan-400/10 backdrop-blur-xl p-4 rounded-xl border border-cyan-400/20" style={{ borderColor: primaryColor !== '#000000' ? `${primaryColor}33` : undefined }}>
                         {config.showShoeName && <p className="text-xs font-bold truncate uppercase">{displayShoeName}</p>}
                     </div>
@@ -1020,7 +1050,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                         </div>
                         <div>
                             <p className="text-[10px] opacity-40 mb-2 font-black uppercase tracking-widest">Hardware Specs</p>
-                            <p className="text-xl font-bold bg-cyan-400 text-blue-950 px-4 py-1 inline-block rounded-md" style={{ backgroundColor: primaryColor !== '#000000' ? primaryColor : undefined }}>SIZE {order.items[0]?.size}</p>
+                            <p className="text-xl font-bold bg-cyan-400 text-blue-950 px-4 py-1 inline-block rounded-md" style={{ backgroundColor: primaryColor !== '#000000' ? primaryColor : undefined }}>SIZE {activeItems[0]?.size}</p>
                         </div>
                     </div>
                     <div className="border-2 border-cyan-400/30 rounded-2xl p-6 bg-cyan-950/20 backdrop-blur-md" style={{ borderColor: primaryColor !== '#000000' ? `${primaryColor}4D` : undefined }}>
@@ -1071,11 +1101,11 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[90%] border border-black/5" />
                 <div className="relative z-10 w-full px-12">
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[20vw] font-black text-black/5 whitespace-nowrap pointer-events-none select-none">
-                        {order.items[0]?.size}
+                        {activeItems[0]?.size}
                     </div>
-                    {order.items[0]?.image && (
+                    {activeItems[0]?.image && (
                         <img
-                            src={order.items[0].image}
+                            src={activeItems[0].image}
                             className="w-full object-contain relative z-20 drop-shadow-2xl"
                             style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
                         />
@@ -1097,7 +1127,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             <div className="p-12 border-t-4 border-black grid grid-cols-3 gap-8 font-sans" style={{ borderColor: primaryColor !== '#000000' ? primaryColor : undefined }}>
                 <div>
                     <p className="font-black uppercase text-xs mb-2">Model Spec</p>
-                    <p className="text-2xl font-bold">{['clothes', 'pants'].includes(order.items[0]?.category || '') ? order.items[0]?.size : `${order.items[0]?.size} EUR`}</p>
+                    <p className="text-2xl font-bold">{['clothes', 'pants'].includes(activeItems[0]?.category || '') ? activeItems[0]?.size : `${activeItems[0]?.size} EUR`}</p>
                 </div>
                 <div className="border-l border-black pl-8" style={{ borderColor: primaryColor !== '#000000' ? primaryColor : undefined }}>
                     <p className="font-black uppercase text-xs mb-2">Recipient</p>
@@ -1138,18 +1168,27 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
 
                 <div className="flex-1 relative flex items-center justify-center border-4 border-black bg-white/10 my-4 pattern-grid-lg" style={{ borderColor: primaryColor !== '#000000' ? primaryColor : undefined }}>
                     <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,black_1px,transparent_1px)] bg-[size:20px_20px]" />
-                    {order.items[0]?.image && (
-                        <img
-                            src={order.items[0].image}
-                            className="w-[90%] object-contain drop-shadow-[10px_10px_0px_rgba(0,0,0,0.2)] grayscale contrast-125"
-                            style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
-                        />
-                    )}
+                    <div className="relative w-full h-full flex items-center justify-center">
+                        {activeItems.map((item, idx) => (
+                            item.image && (
+                                <img
+                                    key={idx}
+                                    src={item.image}
+                                    className="absolute w-[85%] h-[85%] object-contain drop-shadow-[10px_10px_0px_rgba(0,0,0,0.2)] grayscale contrast-125 transition-all duration-500"
+                                    style={{ 
+                                        transform: `scale(${imgScale * (1 - idx * 0.12)}) rotate(${shoeRotation + (idx * 15)}deg) translate(${shoeX + (idx * 40)}px, ${shoeY + (idx * 40)}px)`,
+                                        zIndex: 10 - idx,
+                                        opacity: idx === 0 ? 1 : 0.4
+                                    }}
+                                />
+                            )
+                        ))}
+                    </div>
                     <div
                         className="absolute bottom-4 right-4 bg-black text-white px-6 py-2 font-bold text-xl -rotate-2"
                         style={{ backgroundColor: primaryColor !== '#000000' ? primaryColor : 'black' }}
                     >
-                        SIZE: {order.items[0]?.size}
+                        SIZE: {activeItems[0]?.size}
                     </div>
                 </div>
 
@@ -1212,16 +1251,23 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center relative">
-                {order.items[0]?.image && (
-                    <div className="relative w-full aspect-square max-w-lg">
-                        <div className="absolute inset-0 bg-primary/5 rounded-full blur-3xl scale-110 animate-pulse" style={{ backgroundColor: primaryColor !== '#000000' ? primaryColor : undefined }} />
-                        <img
-                            src={order.items[0].image}
-                            className="w-full h-full object-contain relative z-10 drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
-                            style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
-                        />
-                    </div>
-                )}
+                <div className="relative w-full aspect-square max-w-lg flex items-center justify-center">
+                    <div className="absolute inset-0 bg-primary/5 rounded-full blur-3xl scale-110 animate-pulse" style={{ backgroundColor: primaryColor !== '#000000' ? primaryColor : undefined }} />
+                    {activeItems.map((item, idx) => (
+                        item.image && (
+                            <img
+                                key={idx}
+                                src={item.image}
+                                className="absolute w-full h-full object-contain relative z-10 drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500"
+                                style={{ 
+                                    transform: `scale(${imgScale * (1 - idx * 0.1)}) rotate(${shoeRotation + (idx * 10)}deg) translate(${shoeX + (idx * 30)}px, ${shoeY + (idx * 30)}px)`,
+                                    zIndex: 10 - idx,
+                                    opacity: idx === 0 ? 1 : 0.6
+                                }}
+                            />
+                        )
+                    ))}
+                </div>
                 {config.showShoeName && (
                     <div className="mt-8 text-center" style={{ transform: `scale(${fontScale})` }}>
                         <h2 className="text-4xl font-black text-white uppercase tracking-tight">{displayShoeName}</h2>
@@ -1235,11 +1281,11 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     <div className="grid grid-cols-2 gap-4">
                         <div className="bg-white/5 backdrop-blur-md p-4 rounded-2xl border border-white/10">
                             <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">Scale</p>
-                            <p className="text-xl font-bold text-white">{order.items[0]?.size} {!['clothes', 'pants'].includes(order.items[0]?.category || '') && <span className="text-[10px] font-normal opacity-50">EUR</span>}</p>
+                            <p className="text-xl font-bold text-white">{activeItems[0]?.size} {!['clothes', 'pants'].includes(activeItems[0]?.category || '') && <span className="text-[10px] font-normal opacity-50">EUR</span>}</p>
                         </div>
                         <div className="bg-white/5 backdrop-blur-md p-4 rounded-2xl border border-white/10">
                             <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">{isChinese ? '数量' : 'Qty'}</p>
-                            <p className="text-xl font-bold text-white">x{order.items[0]?.quantity}</p>
+                            <p className="text-xl font-bold text-white">x{activeItems[0]?.quantity}</p>
                         </div>
                     </div>
                     <div className="bg-white/5 backdrop-blur-md p-5 rounded-3xl border border-white/10 space-y-3">
@@ -1291,19 +1337,29 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
 
                 <div className="relative aspect-square max-w-lg mx-auto flex items-center justify-center">
                     <div className="absolute inset-0 bg-gradient-to-b from-[#f3efea] to-transparent rounded-full opacity-50 blur-3xl scale-90" />
-                    {order.items[0]?.image && (
-                        <img
-                            src={order.items[0].image}
-                            className="w-full h-full object-contain relative z-10 drop-shadow-2xl"
-                            style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
-                        />
-                    )}
+                <div className="relative aspect-square max-w-lg mx-auto flex items-center justify-center w-full">
+                    <div className="absolute inset-0 bg-gradient-to-b from-[#f3efea] to-transparent rounded-full opacity-50 blur-3xl scale-90" />
+                    {activeItems.map((item, idx) => (
+                        item.image && (
+                            <img
+                                key={idx}
+                                src={item.image}
+                                className="absolute w-full h-full object-contain relative z-10 drop-shadow-2xl transition-all duration-500"
+                                style={{ 
+                                    transform: `scale(${imgScale * (1 - idx * 0.15)}) rotate(${shoeRotation + (idx * -15)}deg) translate(${shoeX + (idx * -20)}px, ${shoeY + (idx * -20)}px)`,
+                                    zIndex: 10 - idx,
+                                    opacity: idx === 0 ? 1 : 0.5
+                                }}
+                            />
+                        )
+                    ))}
+                </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-12 text-center" style={{ transform: `scale(${fontScale})`, transformOrigin: 'bottom center' }}>
                     <div className="space-y-1">
                         <p className="text-[10px] uppercase tracking-widest opacity-40">Size</p>
-                        <p className="text-xl">{order.items[0]?.size}</p>
+                        <p className="text-xl">{activeItems[0]?.size}{activeItems.length > 1 ? ` (+${activeItems.length - 1})` : ''}</p>
                     </div>
                     <div className="space-y-1 border-x border-[#d4cfc9]" style={{ borderColor: textColor !== '#000000' ? `${textColor}20` : undefined }}>
                         <p className="text-[10px] uppercase tracking-widest opacity-40">Release</p>
@@ -1340,13 +1396,22 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     <div className="absolute top-4 left-4 bg-black text-white px-4 py-1 skew-x-[-15deg] z-20" style={{ backgroundColor: textColor !== '#000000' ? textColor : 'black' }}>
                         NEW DROP!
                     </div>
-                    {order.items[0]?.image && (
-                        <img
-                            src={order.items[0].image}
-                            className="w-[90%] object-contain relative z-10 filter contrast-125 brightness-110"
-                            style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
-                        />
-                    )}
+                    <div className="relative w-full h-full flex items-center justify-center">
+                        {activeItems.map((item, idx) => (
+                            item.image && (
+                                <img
+                                    key={idx}
+                                    src={item.image}
+                                    className="absolute w-[80%] h-[80%] object-contain relative z-10 filter contrast-125 brightness-110 transition-all duration-500"
+                                    style={{ 
+                                        transform: `scale(${imgScale * (1 - idx * 0.12)}) rotate(${shoeRotation + (idx * -12)}deg) translate(${shoeX + (idx * -30)}px, ${shoeY + (idx * -30)}px)`,
+                                        zIndex: 10 - idx,
+                                        opacity: idx === 0 ? 1 : 0.7
+                                    }}
+                                />
+                            )
+                        ))}
+                    </div>
                     <div className="absolute bottom-8 right-8 bg-[#00ff21] border-[6px] border-black p-6 rounded-full -rotate-12 shadow-[10px_10px_0px_#000] z-20 flex flex-col items-center" style={{ backgroundColor: primaryColor !== '#000000' ? primaryColor : '#00ff21', borderColor: textColor !== '#000000' ? textColor : 'black' }}>
                         <span className="text-xs uppercase leading-none mb-1">Price</span>
                         <span className="text-4xl">¥{order.totalAmount.toLocaleString()}</span>
@@ -1360,7 +1425,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                             <p>Customer: {order.customer.name}</p>
                             <p>{getTrackingDisplay()}</p>
                         </div>
-                        <div className="text-4xl italic">#{order.items[0]?.size}</div>
+                        <div className="text-4xl italic">#{activeItems[0]?.size}{activeItems.length > 1 ? `+` : ''}</div>
                     </div>
                 </div>
             </div>
@@ -1379,13 +1444,22 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
 
             <div className="col-span-12 row-span-7 bg-[#000] relative overflow-hidden flex items-center justify-center border-b border-[#333]" style={{ backgroundColor: bgColor !== '#ffffff' ? bgColor : '#000', borderColor: textColor !== '#000000' ? `${textColor}20` : undefined }}>
                 <div className="absolute inset-0 opacity-20 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px]" />
-                {order.items[0]?.image && (
-                    <img
-                        src={order.items[0].image}
-                        className="w-[85%] object-contain relative z-10 shadow-[0_0_100px_rgba(255,255,255,0.1)]"
-                        style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
-                    />
-                )}
+                <div className="relative w-full h-full flex items-center justify-center">
+                    {activeItems.map((item, idx) => (
+                        item.image && (
+                            <img
+                                key={idx}
+                                src={item.image}
+                                className="absolute w-[80%] h-[80%] object-contain relative z-10 shadow-[0_0_100px_rgba(255,255,255,0.1)] transition-all duration-500"
+                                style={{ 
+                                    transform: `scale(${imgScale * (1 - idx * 0.1)}) rotate(${shoeRotation + (idx * 90)}deg) translate(${shoeX}px, ${shoeY}px)`,
+                                    zIndex: 10 - idx,
+                                    opacity: idx === 0 ? 1 : 0.4
+                                }}
+                            />
+                        )
+                    ))}
+                </div>
                 <div className="absolute top-8 right-8 writing-vertical-lr font-black text-6xl text-white/5 select-none" style={{ color: textColor !== '#000000' ? `${textColor}05` : undefined }}>AUTHENTIC</div>
             </div>
 
@@ -1397,11 +1471,11 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             <div className="col-span-3 row-span-3 bg-[#111] p-8 border-r border-[#333] flex flex-col justify-between" style={{ backgroundColor: bgColor !== '#ffffff' ? bgColor : '#111', borderColor: textColor !== '#000000' ? `${textColor}20` : undefined }}>
                 <div>
                     <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1" style={{ color: textColor !== '#000000' ? `${textColor}40` : undefined }}>Spec</p>
-                    <p className="text-2xl font-bold">{order.items[0]?.size} EU</p>
+                    <p className="text-2xl font-bold">{activeItems[0]?.size}{activeItems.length > 1 ? `+` : ''} EU</p>
                 </div>
                 <div>
                     <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1" style={{ color: textColor !== '#000000' ? `${textColor}40` : undefined }}>Unit</p>
-                    <p className="text-2xl font-bold">x{order.items[0]?.quantity}</p>
+                    <p className="text-2xl font-bold">x{activeItems[0]?.quantity}</p>
                 </div>
             </div>
 
@@ -1420,13 +1494,22 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
 
                 <div className="flex-1 bg-slate-50 relative overflow-hidden flex items-center justify-center border border-slate-100/50">
                     <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#000_1px,transparent_1px)] bg-[size:10px_10px]" />
-                    {order.items[0]?.image && (
-                        <img
-                            src={order.items[0].image}
-                            className="w-full h-full object-contain relative z-10 filter sepia-[0.1] contrast-[1.05]"
-                            style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
-                        />
-                    )}
+                    <div className="relative w-full h-full flex items-center justify-center">
+                        {activeItems.map((item, idx) => (
+                            item.image && (
+                                <img
+                                    key={idx}
+                                    src={item.image}
+                                    className="absolute w-full h-full object-contain filter sepia-[0.1] contrast-[1.05] transition-all duration-500"
+                                    style={{ 
+                                        transform: `scale(${imgScale * (1 - idx * 0.1)}) rotate(${shoeRotation + (idx * 5)}deg) translate(${shoeX + (idx * 20)}px, ${shoeY + (idx * 20)}px)`,
+                                        zIndex: 10 - idx,
+                                        opacity: idx === 0 ? 1 : 0.6
+                                    }}
+                                />
+                            )
+                        ))}
+                    </div>
                 </div>
 
                 <div className="pt-8 pb-4 px-2 space-y-6">
@@ -1434,7 +1517,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                         <div style={{ transform: `scale(${fontScale})`, transformOrigin: 'top left' }}>
                             {config.showShoeName && <h2 className="text-3xl font-black italic tracking-tighter text-slate-800 uppercase mix-blend-multiply">{displayShoeName}</h2>}
                             <div className="flex gap-4 mt-2">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border border-slate-200 px-2 py-0.5 rounded-sm">Size: {order.items[0]?.size}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border border-slate-200 px-2 py-0.5 rounded-sm">Size: {activeItems[0]?.size}{activeItems.length > 1 ? ` (+${activeItems.length - 1})` : ''}</p>
                                 {config.showOrderId && <p className="text-[10px] font-mono text-slate-300">#{order.id.slice(0, 8)}</p>}
                             </div>
                         </div>
@@ -1493,15 +1576,24 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     <div className="text-right font-black italic text-4xl text-white/5 select-none leading-none">ORDER<br />POSTER</div>
                 </div>
 
-                <div className="relative flex flex-col items-center">
-                    {order.items[0]?.image && (
-                        <img
-                            src={order.items[0].image}
-                            className="w-full max-w-xl object-contain drop-shadow-[0_40px_80px_rgba(0,0,0,0.8)]"
-                            style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
-                        />
-                    )}
+                <div className="relative flex flex-col items-center w-full min-h-[400px] justify-center">
                     <div className="absolute top-1/2 left-0 w-full h-32 bg-primary/5 -translate-y-1/2 blur-3xl rounded-full" style={{ backgroundColor: primaryColor !== '#000000' ? primaryColor : undefined, opacity: 0.1 }} />
+                    <div className="relative w-full h-full flex items-center justify-center">
+                        {activeItems.map((item, idx) => (
+                            item.image && (
+                                <img
+                                    key={idx}
+                                    src={item.image}
+                                    className="absolute w-full max-w-xl object-contain drop-shadow-[0_40px_80px_rgba(0,0,0,0.8)] transition-all duration-500"
+                                    style={{ 
+                                        transform: `scale(${imgScale * (1 - idx * 0.1)}) rotate(${shoeRotation + (idx * -8)}deg) translate(${shoeX + (idx * 30)}px, ${shoeY + (idx * 30)}px)`,
+                                        zIndex: 10 - idx,
+                                        opacity: idx === 0 ? 1 : 0.5
+                                    }}
+                                />
+                            )
+                        ))}
+                    </div>
                 </div>
 
                 <div className="space-y-8" style={{ transform: `scale(${fontScale})`, transformOrigin: 'bottom left' }}>
@@ -1515,7 +1607,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     <div className="grid grid-cols-4 gap-12 border-t border-white/5 pt-12">
                         <div>
                             <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-3">Specifications</p>
-                            <p className="text-2xl font-bold tracking-tight">EU {order.items[0]?.size}</p>
+                            <p className="text-2xl font-bold tracking-tight">EU {activeItems[0]?.size}{activeItems.length > 1 ? ` (+${activeItems.length - 1})` : ''}</p>
                             <p className="text-xs text-white/40 mt-1">Authentic Gear</p>
                         </div>
                         <div className="col-span-1">
@@ -1564,13 +1656,22 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
 
             <div className="flex-1 flex flex-col items-center justify-center relative">
                 <div className="absolute w-[120%] aspect-square bg-gradient-radial from-primary/5 to-transparent opacity-50 blur-2xl" style={{ backgroundColor: primaryColor !== '#000000' ? primaryColor : undefined }} />
-                {order.items[0]?.image && (
-                    <img
-                        src={order.items[0].image}
-                        className="w-[90%] object-contain relative z-10 drop-shadow-[0_40px_100px_rgba(0,0,0,0.1)]"
-                        style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
-                    />
-                )}
+                <div className="relative w-full h-full flex items-center justify-center">
+                    {activeItems.map((item, idx) => (
+                        item.image && (
+                            <img
+                                key={idx}
+                                src={item.image}
+                                className="absolute w-[90%] object-contain relative z-10 drop-shadow-[0_40px_100px_rgba(0,0,0,0.1)] transition-all duration-500"
+                                style={{ 
+                                    transform: `scale(${imgScale * (1 - idx * 0.12)}) rotate(${shoeRotation + (idx * 12)}deg) translate(${shoeX + (idx * 40)}px, ${shoeY + (idx * 40)}px)`,
+                                    zIndex: 10 - idx,
+                                    opacity: idx === 0 ? 1 : 0.6
+                                }}
+                            />
+                        )
+                    ))}
+                </div>
                 {config.showShoeName && (
                     <div className="mt-16 text-center" style={{ transform: `scale(${fontScale})` }}>
                         <h2 className="text-5xl font-extralight tracking-tighter opacity-90 italic uppercase">{displayShoeName}</h2>
@@ -1584,11 +1685,11 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     <div className="flex gap-12">
                         <div>
                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Scale</p>
-                            <p className="text-xl font-light">{order.items[0]?.size} EU</p>
+                            <p className="text-xl font-light">{activeItems[0]?.size} EU</p>
                         </div>
                         <div>
                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Units</p>
-                            <p className="text-xl font-light">x{order.items[0]?.quantity}</p>
+                            <p className="text-xl font-light">x{activeItems[0]?.quantity}</p>
                         </div>
                     </div>
                     {config.showTracking && (
@@ -1625,9 +1726,9 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
 
             <div className="flex-1 flex flex-col items-center justify-center relative">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[180px] font-black opacity-[0.03] select-none pointer-events-none italic whitespace-nowrap">FLASH DROP</div>
-                {order.items[0]?.image && (
+                {activeItems[0]?.image && (
                     <img
-                        src={order.items[0].image}
+                        src={activeItems[0].image}
                         className="w-full object-contain relative z-10 drop-shadow-[0_20px_60px_rgba(239,68,68,0.3)] skew-y-[-5deg]"
                         style={{
                             transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)`,
@@ -1651,7 +1752,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                     </div>
                     <div className="bg-white/5 p-4 border-l-4 border-primary" style={{ borderColor: primaryColor !== '#000000' ? primaryColor : '#ef4444' }}>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1">Specifications</p>
-                        <p className="text-lg font-bold uppercase">SIZE {order.items[0]?.size}</p>
+                        <p className="text-lg font-bold uppercase">SIZE {activeItems[0]?.size}</p>
                     </div>
                     {config.showPrice && (
                         <div className="bg-primary text-black p-4 skew-x-[-5deg] text-right" style={{ backgroundColor: primaryColor !== '#000000' ? primaryColor : '#ef4444' }}>
@@ -1693,7 +1794,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                 <div className="absolute top-4 left-4 text-[10px] opacity-40 bg-white/10 px-2 py-1">COORD_SYS: CARTESIAN</div>
                 <div className="absolute top-4 right-4 text-6xl font-black text-white/5 select-none">SF-BLUEPRINT</div>
 
-                {order.items[0]?.image && (
+                {activeItems[0]?.image && (
                     <div className="relative">
                         <div className="absolute -left-12 top-1/2 -translate-y-1/2 w-8 h-[2px] bg-white opacity-40" />
                         <div className="absolute -right-12 top-1/2 -translate-y-1/2 w-8 h-[2px] bg-white opacity-40" />
@@ -1701,7 +1802,7 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
                         <div className="absolute left-1/2 -bottom-12 -translate-x-1/2 w-[2px] h-8 bg-white opacity-40" />
 
                         <img
-                            src={order.items[0].image}
+                            src={activeItems[0].image}
                             className="w-[85%] object-contain relative z-10 filter brightness-110 contrast-125 grayscale opacity-90 drop-shadow-[0_0_40px_rgba(255,255,255,0.2)]"
                             style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
                         />
@@ -1762,11 +1863,11 @@ export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order
             <div className="flex-1 flex flex-col items-center justify-center relative">
                 <div className="absolute inset-0 bg-white/40 backdrop-blur-3xl rounded-[3rem] border border-white/40 shadow-xl" />
 
-                {order.items[0]?.image && (
+                {activeItems[0]?.image && (
                     <div className="relative z-10 w-[85%] aspect-square flex items-center justify-center">
                         <div className="absolute inset-0 bg-primary/5 rounded-full blur-3xl scale-90" style={{ backgroundColor: primaryColor !== '#000000' ? primaryColor : undefined }} />
                         <img
-                            src={order.items[0].image}
+                            src={activeItems[0].image}
                             className="w-full h-full object-contain relative z-10 drop-shadow-[0_30px_60px_rgba(0,0,0,0.12)]"
                             style={{ transform: `scale(${imgScale}) rotate(${shoeRotation}deg) translate(${shoeX}px, ${shoeY}px)` }}
                         />

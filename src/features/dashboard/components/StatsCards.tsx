@@ -1,11 +1,14 @@
 import { useFilteredOrders } from '@/hooks/useFilteredOrders'
 import { GlassCard } from '@/components/ui/LayoutPrimitives'
-import { TrendingUp, Package, Banknote } from 'lucide-react'
+import { TrendingUp, Package, Banknote, RotateCcw } from 'lucide-react'
 import { isSameDay, isSameMonth, parseISO } from 'date-fns'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 
 export function StatsCards() {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
+    const navigate = useNavigate()
+    const isChinese = i18n.language.startsWith('zh')
     const orders = useFilteredOrders()
     const today = new Date()
 
@@ -17,6 +20,11 @@ export function StatsCards() {
 
     const todayProfit = todayOrders.reduce((acc, o) => acc + (o.profit || 0), 0)
     const monthProfit = monthOrders.reduce((acc, o) => acc + (o.profit || 0), 0)
+
+    const refundedItemsCount = orders.reduce((acc, o) => acc + o.items.filter(i => i.isRefunded).length, 0)
+    const totalRefundAmount = orders.reduce((acc, o) => {
+        return acc + o.items.filter(i => i.isRefunded).reduce((sum, i) => sum + (i.price * i.quantity), 0)
+    }, 0)
 
     const stats = [
         {
@@ -45,14 +53,31 @@ export function StatsCards() {
             icon: Package,
             color: "text-purple-500",
             bg: "bg-purple-500/10"
+        },
+        {
+            title: isChinese ? '总退款单数' : 'Refunded Items',
+            value: refundedItemsCount,
+            subLabel: isChinese ? '总退款金额' : 'Refund Amount',
+            subValue: `¥ ${totalRefundAmount.toLocaleString()}`,
+            icon: RotateCcw,
+            color: "text-red-500",
+            bg: "bg-red-500/10",
+            onClick: () => navigate('/orders?filter=refunded')
         }
     ]
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {stats.map((stat, i) => (
-                <GlassCard key={i} className="p-6 flex items-center gap-4 group hover:scale-[1.02] transition-transform cursor-default">
-                    <div className={`p-4 rounded-2xl ${stat.bg} ${stat.color} shrink-0`}>
+                <GlassCard 
+                    key={i} 
+                    className={cn(
+                        "p-6 flex items-center gap-4 group hover:scale-[1.02] transition-transform",
+                        stat.onClick ? "cursor-pointer hover:shadow-lg hover:shadow-red-500/5 active:scale-95" : "cursor-default"
+                    )}
+                    onClick={stat.onClick}
+                >
+                    <div className={`p-4 rounded-2xl ${stat.bg} ${stat.color} shrink-0 group-hover:scale-110 transition-transform`}>
                         <stat.icon size={26} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -68,3 +93,8 @@ export function StatsCards() {
         </div>
     )
 }
+
+function cn(...classes: any[]) {
+    return classes.filter(Boolean).join(' ')
+}
+

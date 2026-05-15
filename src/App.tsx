@@ -11,8 +11,24 @@ import { SettingsPage } from "@/pages/Settings";
 function App() {
   return (
     <>
-      <Toaster position="top-center" richColors />
-      <BrowserRouter basename="/SoleFlow">
+      <Toaster 
+        position="top-center" 
+        richColors 
+        toastOptions={{
+          className: "rounded-[2.5rem] backdrop-blur-2xl bg-white/60 dark:bg-slate-900/60 border-white/40 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.1)] py-4 px-6 font-bold tracking-tight !text-center",
+          classNames: {
+            title: "w-full text-center",
+            description: "w-full text-center",
+            content: "w-full items-center text-center"
+          },
+          style: {
+            borderRadius: '2.5rem',
+            textAlign: 'center',
+            justifyContent: 'center',
+          }
+        }}
+      />
+      <BrowserRouter>
         <Routes>
           <Route element={<DashboardLayout />}>
             <Route path="/" element={<Dashboard />} />

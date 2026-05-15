@@ -1,31 +1,88 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo } from 'react'
 import { useOrderStore } from '@/store/useOrderStore'
 import { GlassCard, Button } from '@/components/ui/LayoutPrimitives'
 import { Input, Select } from '@/components/ui/FormPrimitives'
-import { Search, Package, ExternalLink, User, Image as ImageIcon, Edit2, LayoutGrid, List, Download, Upload as UploadIcon, Trash2, TrendingUp, FileJson, Phone, Copy } from 'lucide-react'
+import { Search, Package, ExternalLink, User, Image as ImageIcon, Edit2, LayoutGrid, List, Download, Upload as UploadIcon, Trash2, TrendingUp, Phone, Copy, RotateCcw } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { COURIER_OPTIONS, SIZE_MAPPING } from '@/types/order'
 import type { Order } from '@/types/order'
-import { format, isWithinInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns'
-import { Modal } from '@/components/ui/Modal'
+import { format } from 'date-fns'
 import { zhCN, enUS } from 'date-fns/locale'
 import { OrderPosterModal } from './OrderPosterModal'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
-import { exportToExcel, importFromExcel } from '@/lib/excelUtils'
-import { exportToJson, importFromJson } from '@/lib/jsonUtils'
+import { DataManagementModal } from '@/components/DataManagementModal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 
 type SortOption = 'newest' | 'oldest' | 'price-high' | 'price-low' | 'customer'
 
+const OrderImageStack = ({ items }: { items: any[] }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const hasMultiple = items.length > 1;
+
+    const handleNext = (e: React.MouseEvent) => {
+        if (hasMultiple) {
+            e.stopPropagation();
+            setCurrentIndex((prev) => (prev + 1) % items.length);
+        }
+    };
+
+    if (!items || items.length === 0) return <Package size={48} className="text-slate-300" />;
+
+    return (
+        <div 
+            className="relative w-full h-full flex items-center justify-center cursor-pointer group/stack"
+            onClick={handleNext}
+        >
+            <AnimatePresence mode="wait">
+                <div className="relative w-full h-full">
+                    <motion.img
+                        key={currentIndex}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.2 }}
+                        src={items[currentIndex].image}
+                        alt={items[currentIndex].name}
+                        className={cn("w-full h-full object-contain drop-shadow-xl", items[currentIndex].isRefunded && "grayscale opacity-60")}
+                    />
+                    {items[currentIndex].isRefunded && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="bg-red-500/80 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider transform -rotate-12 shadow-lg">
+                                Refunded
+                            </span>
+                        </div>
+                    )}
+                </div>
+            </AnimatePresence>
+
+            {hasMultiple && (
+                <>
+                    {/* Shadow stacks effect */}
+                    <div className="absolute inset-0 -z-10 translate-x-1 translate-y-1 opacity-20 scale-95 blur-[1px]">
+                        <img src={items[(currentIndex + 1) % items.length].image} className="w-full h-full object-contain" alt="" />
+                    </div>
+                    
+                    {/* Counter */}
+                    <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] text-white font-black z-20 flex items-center gap-1">
+                        <span>{currentIndex + 1}</span>
+                        <span className="opacity-40">/</span>
+                        <span className="opacity-60">{items.length}</span>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
 export function OrderList() {
     const { t, i18n } = useTranslation()
     const isChinese = i18n.language.startsWith('zh')
     const locale = isChinese ? zhCN : enUS
     const navigate = useNavigate()
-    const { orders, importOrders, deleteOrder, categoryFilter, setCategoryFilter } = useOrderStore()
+    const { orders, deleteOrder, deleteOrders, categoryFilter, setCategoryFilter } = useOrderStore()
     const [search, setSearch] = useState('')
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
     const [layout, setLayout] = useState<'grid' | 'list'>(() => {
@@ -44,13 +101,13 @@ export function OrderList() {
         description: string;
         onConfirm: () => void;
     }>({ isOpen: false, title: '', description: '', onConfirm: () => { } })
-    const importInputRef = useRef<HTMLInputElement>(null)
-    const jsonImportInputRef = useRef<HTMLInputElement>(null)
-    const [exportModal, setExportModal] = useState<{
-        isOpen: boolean,
-        exportType: 'all' | 'selected',
-        format: 'excel' | 'json'
-    }>({ isOpen: false, exportType: 'all', format: 'excel' })
+    // Refs removed as they are now in DataManagementModal
+    const [isDataModalOpen, setIsDataModalOpen] = useState(false)
+    const [dataModalMode, setDataModalMode] = useState<'all' | 'selected'>('all')
+    const [showRefundedOnly, setShowRefundedOnly] = useState(() => {
+        const params = new URLSearchParams(window.location.search)
+        return params.get('filter') === 'refunded'
+    })
 
     const handleCopyOrderInfo = (order: Order) => {
         const itemsStr = order.items.map(item => `${item.name} ${item.size}码`).join('\n')
@@ -60,66 +117,26 @@ export function OrderList() {
             .catch(() => toast.error(isChinese ? '复制失败' : 'Failed to copy'))
     }
 
-    const executeExport = (range: 'all' | 'week' | 'month' | 'year') => {
-        const now = new Date()
-        let dataToExport = exportModal.exportType === 'selected' ? orders.filter(o => selectedIds.has(o.id)) : orders
-
-        if (range === 'week') {
-            dataToExport = dataToExport.filter(o => isWithinInterval(new Date(o.createdAt), { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) }))
-        } else if (range === 'month') {
-            dataToExport = dataToExport.filter(o => isWithinInterval(new Date(o.createdAt), { start: startOfMonth(now), end: endOfMonth(now) }))
-        } else if (range === 'year') {
-            dataToExport = dataToExport.filter(o => isWithinInterval(new Date(o.createdAt), { start: startOfYear(now), end: endOfYear(now) }))
-        }
-
-        const getTag = () => {
-            if (range === 'week') {
-                return isChinese 
-                    ? `本周(${format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')}至${format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')})`
-                    : `Week_${format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyyMMdd')}-${format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyyMMdd')}`
-            }
-            if (range === 'month') {
-                return isChinese 
-                    ? `本月(${format(now, 'yyyy-MM')})`
-                    : `Month_${format(now, 'yyyy-MM')}`
-            }
-            if (range === 'year') {
-                return isChinese 
-                    ? `本年(${format(now, 'yyyy')})`
-                    : `Year_${format(now, 'yyyy')}`
-            }
-            if (range === 'all' && dataToExport.length > 0) {
-                const dates = dataToExport.map(o => new Date(o.createdAt).getTime())
-                const start = new Date(Math.min(...dates))
-                const end = new Date(Math.max(...dates))
-                return isChinese
-                    ? `全部(${format(start, 'yyyyMMdd')}至${format(end, 'yyyyMMdd')})`
-                    : `All_${format(start, 'yyyyMMdd')}-${format(end, 'yyyyMMdd')}`
-            }
-            return isChinese ? '全部' : 'All'
-        }
-
-        const tag = getTag()
-
-        if (exportModal.format === 'excel') {
-            handleExport(dataToExport, tag)
-        } else {
-            handleJsonExport(dataToExport, tag)
-        }
-        setExportModal(prev => ({ ...prev, isOpen: false }))
-    }
+    // handleImportExcel removed (integrated into DataManagementModal)
+    // handleImportJson removed (integrated into DataManagementModal)
 
     const filteredAndSortedOrders = useMemo(() => {
         let result = orders.filter(order =>
             order.customer.name.toLowerCase().includes(search.toLowerCase()) ||
             order.customer.phone.includes(search) ||
-            order.shipping.trackingNumber.includes(search) ||
+            order.shipping.trackingNumber.toLowerCase().includes(search.toLowerCase()) ||
             order.items.some(item => item.name.toLowerCase().includes(search.toLowerCase()))
         )
 
         if (categoryFilter !== 'all') {
             result = result.filter(order =>
                 order.items.some(item => (item.category || 'shoes') === categoryFilter)
+            )
+        }
+
+        if (showRefundedOnly) {
+            result = result.filter(order =>
+                order.items.some(item => item.isRefunded)
             )
         }
 
@@ -142,46 +159,18 @@ export function OrderList() {
         }
 
         return result
-    }, [orders, search, sortBy, categoryFilter])
+    }, [orders, search, sortBy, categoryFilter, showRefundedOnly])
 
     const getCourierLabel = (val: string) => COURIER_OPTIONS.find(c => c.value === val)?.label || val
 
     const getTrackingLink = (order: Order) => {
         const courier = COURIER_OPTIONS.find(c => c.value === order.shipping.company);
-        if (courier && courier.urlQuery) {
-            return courier.urlQuery + order.shipping.trackingNumber
+        if (courier && courier.urlQuery && order.shipping.trackingNumber) {
+            const url = courier.urlQuery + order.shipping.trackingNumber;
+            // Ensure URL is absolute to prevent GH Pages 404
+            return url.startsWith('http') ? url : `https://${url}`;
         }
-        return '#'
-    }
-
-    const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (file) {
-            try {
-                const newOrders = await importFromExcel(file)
-                importOrders(newOrders)
-                toast.success(isChinese ? `成功导入 ${newOrders.length} 条订单` : `Successfully imported ${newOrders.length} orders`)
-            } catch (err) {
-                toast.error(isChinese ? '导入失败，请检查文件格式' : 'Import failed, please check file format')
-            } finally {
-                if (importInputRef.current) importInputRef.current.value = ''
-            }
-        }
-    }
-
-    const handleImportJson = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (file) {
-            try {
-                const newOrders = await importFromJson(file)
-                importOrders(newOrders)
-                toast.success(isChinese ? `成功导入 ${newOrders.length} 条订单` : `Successfully imported ${newOrders.length} orders`)
-            } catch (err) {
-                toast.error(isChinese ? '导入失败，请检查文件格式' : 'Import failed, please check file format')
-            } finally {
-                if (jsonImportInputRef.current) jsonImportInputRef.current.value = ''
-            }
-        }
+        return undefined;
     }
 
     const toggleSelect = (id: string) => {
@@ -199,27 +188,12 @@ export function OrderList() {
         }
     }
 
-    const handleExport = async (data: Order[], tag: string = '') => {
-        const promise = exportToExcel(data, i18n.language, tag)
-        toast.promise(promise, {
-            loading: isChinese ? '正在导出 Excel...' : 'Exporting Excel...',
-            success: isChinese ? '导出成功' : 'Export successful',
-            error: isChinese ? '导出失败' : 'Export failed'
-        })
-    }
-
-    const handleJsonExport = async (data: Order[], tag: string = '') => {
-        const promise = exportToJson(data, i18n.language, tag)
-        toast.promise(promise, {
-            loading: isChinese ? '正在导出 JSON...' : 'Exporting JSON...',
-            success: isChinese ? '导出成功' : 'Export successful',
-            error: isChinese ? '导出失败' : 'Export failed'
-        })
-    }
+    // handleExport removed (integrated into DataManagementModal)
+    // handleJsonExport removed (integrated into DataManagementModal)
 
     const handleBatchExport = () => {
-        // Default to excel for batch, or we could add a format selector
-        setExportModal({ isOpen: true, exportType: 'selected', format: 'excel' })
+        setDataModalMode('selected')
+        setIsDataModalOpen(true)
     }
 
     const handleBatchDelete = () => {
@@ -228,7 +202,7 @@ export function OrderList() {
             title: isChinese ? '确定要删除吗？' : 'Are you sure?',
             description: isChinese ? `确定要删除这 ${selectedIds.size} 条订单吗？此操作不可撤销。` : `Are you sure you want to delete ${selectedIds.size} orders? This action cannot be undone.`,
             onConfirm: () => {
-                selectedIds.forEach(id => deleteOrder(id))
+                deleteOrders(Array.from(selectedIds))
                 setSelectedIds(new Set())
             }
         })
@@ -236,25 +210,27 @@ export function OrderList() {
 
     if (orders.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center p-20 text-slate-400">
-                <Package size={64} className="mb-4 opacity-20" />
-                <h3 className="text-xl font-medium text-slate-500">{t('orders.noOrders')}</h3>
-                <div className="flex flex-wrap items-center justify-center gap-4 mt-6">
-                    <Link to="/orders/new">
-                        <Button className="h-11 px-6">{t('orders.createFirst')}</Button>
-                    </Link>
-                    <Button variant="outline" className="gap-2 h-11 px-6 bg-white/50 dark:bg-slate-900/50" onClick={() => jsonImportInputRef.current?.click()}>
-                        <FileJson size={18} />
-                        {isChinese ? '导入 JSON' : 'Import JSON'}
-                    </Button>
-                    <Button variant="outline" className="gap-2 h-11 px-6 bg-white/50 dark:bg-slate-900/50" onClick={() => importInputRef.current?.click()}>
-                        <UploadIcon size={18} />
-                        {isChinese ? '导入 Excel' : 'Import Excel'}
-                    </Button>
-                    <input type="file" ref={jsonImportInputRef} accept=".json" className="hidden" onChange={handleImportJson} />
-                    <input type="file" ref={importInputRef} accept=".xlsx, .xls" className="hidden" onChange={handleImportExcel} />
+            <>
+                <div className="flex flex-col items-center justify-center p-20 text-slate-400">
+                    <Package size={64} className="mb-4 opacity-20" />
+                    <h3 className="text-xl font-medium text-slate-500">{t('orders.noOrders')}</h3>
+                    <div className="flex flex-wrap items-center justify-center gap-4 mt-6">
+                        <Link to="/orders/new">
+                            <Button className="h-11 px-6">{t('orders.createFirst')}</Button>
+                        </Link>
+                        <Button variant="outline" className="gap-2 h-11 px-6 bg-white/50 dark:bg-slate-900/50" onClick={() => { setDataModalMode('all'); setIsDataModalOpen(true); }}>
+                            <UploadIcon size={18} />
+                            {isChinese ? '管理数据' : 'Manage Data'}
+                        </Button>
+                    </div>
                 </div>
-            </div>
+                <DataManagementModal
+                    isOpen={isDataModalOpen}
+                    onClose={() => setIsDataModalOpen(false)}
+                    mode={dataModalMode}
+                    selectedIds={selectedIds}
+                />
+            </>
         )
     }
 
@@ -295,6 +271,19 @@ export function OrderList() {
                             <option value="price-low">{isChinese ? '金额最低' : 'Price: Low to High'}</option>
                             <option value="customer">{isChinese ? '按收件人' : 'Customer Name'}</option>
                         </Select>
+
+                        <button
+                            onClick={() => setShowRefundedOnly(!showRefundedOnly)}
+                            className={cn(
+                                "h-11 px-4 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border shrink-0",
+                                showRefundedOnly 
+                                    ? "bg-red-500/10 border-red-500/20 text-red-500" 
+                                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                            )}
+                        >
+                            <RotateCcw size={16} className={cn(showRefundedOnly && "animate-spin-slow")} />
+                            {isChinese ? '退款订单' : 'Refunds'}
+                        </button>
                     </div>
                 </div>
 
@@ -335,19 +324,10 @@ export function OrderList() {
                     <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block mx-1" />
 
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setExportModal({ isOpen: true, exportType: 'all', format: 'excel' })} className="h-10 gap-2 px-4 rounded-xl">
+                        <Button variant="outline" size="sm" onClick={() => { setDataModalMode('all'); setIsDataModalOpen(true); }} className="h-10 gap-2 px-4 rounded-xl border-slate-200 dark:border-white/10 hover:bg-primary/5 hover:text-primary transition-all">
                             <Download size={16} />
-                            <span className="hidden sm:inline">{isChinese ? '导出 Excel' : 'Export Excel'}</span>
+                            <span className="hidden sm:inline">{isChinese ? '管理数据' : 'Manage Data'}</span>
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setExportModal({ isOpen: true, exportType: 'all', format: 'json' })} className="h-10 gap-2 px-4 rounded-xl">
-                            <FileJson size={16} />
-                            <span className="hidden sm:inline">{isChinese ? '导出 JSON' : 'Export JSON'}</span>
-                        </Button>
-                        <Button variant="outline" size="sm" className="h-10 gap-2 px-4 rounded-xl" onClick={() => importInputRef.current?.click()}>
-                            <UploadIcon size={16} />
-                            <span className="hidden sm:inline">{isChinese ? '导入 Excel' : 'Import'}</span>
-                        </Button>
-                        <input type="file" ref={importInputRef} accept=".xlsx, .xls" className="hidden" onChange={handleImportExcel} />
                     </div>
                 </div>
             </div>
@@ -381,22 +361,22 @@ export function OrderList() {
                                     onClick={() => toggleSelect(order.id)}
                                 >
                                     <div className="aspect-[16/10] bg-slate-100 dark:bg-slate-800/50 relative overflow-hidden flex items-center justify-center p-4">
-                                        {order.items[0]?.image ? (
-                                            <img
-                                                src={order.items[0].image}
-                                                alt={order.items[0].name}
-                                                className="w-full h-full object-contain drop-shadow-xl transition-transform duration-500 group-hover:scale-110"
-                                            />
-                                        ) : (
-                                            <Package size={48} className="text-slate-300" />
-                                        )}
-                                        <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
+                                        <OrderImageStack items={order.items} />
+                                        <div className="absolute top-3 right-3 flex flex-col gap-2 items-end pointer-events-none">
                                             <span className="px-3 py-1 bg-black/60 backdrop-blur-md text-white text-xs rounded-full font-bold shadow-lg border border-white/20">
                                                 {(() => {
                                                     const sizeInfo = SIZE_MAPPING.find(s => s.eur === order.items[0]?.size);
                                                     return isChinese ? `${order.items[0]?.size} 码` : `US ${sizeInfo?.us || order.items[0]?.size}`;
                                                 })()}
                                             </span>
+                                            {order.items.some(item => item.isRefunded) && (
+                                                <span className={cn(
+                                                    "px-3 py-1 backdrop-blur-md text-white text-[10px] rounded-full font-bold shadow-lg border border-white/20",
+                                                    order.items.every(item => item.isRefunded) ? "bg-red-500/80" : "bg-orange-500/80"
+                                                )}>
+                                                    {order.items.every(item => item.isRefunded) ? (isChinese ? '全部退款' : 'Refunded') : (isChinese ? '部分退款' : 'Partial Refund')}
+                                                </span>
+                                            )}
                                             {order.items.length > 1 && (
                                                 <span className="px-2 py-0.5 bg-primary/80 backdrop-blur-md text-white text-[10px] rounded-md font-bold shadow-lg">
                                                     +{order.items.length - 1} {isChinese ? '更多' : 'more'}
@@ -499,10 +479,8 @@ export function OrderList() {
                                     onClick={() => toggleSelect(order.id)}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className="w-full sm:w-20 h-40 sm:h-20 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden flex items-center justify-center shrink-0 border border-black/5 dark:border-white/5">
-                                            {order.items[0]?.image ? (
-                                                <img src={order.items[0].image} alt={order.items[0].name} className="w-full h-full object-contain" />
-                                            ) : <Package className="text-slate-300" />}
+                                        <div className="w-full sm:w-20 h-40 sm:h-20 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden flex items-center justify-center shrink-0 border border-black/5 dark:border-white/5 relative">
+                                            <OrderImageStack items={order.items} />
                                         </div>
                                     </div>
 
@@ -540,7 +518,10 @@ export function OrderList() {
                                         </div>
                                         <div>
                                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{isChinese ? '实付金额' : 'Total'}</p>
-                                            <p className="text-sm font-black text-primary mt-1">¥{order.totalAmount.toLocaleString()}</p>
+                                            <p className="text-sm font-black text-primary mt-1">
+                                                ¥{order.totalAmount.toLocaleString()}
+                                                {order.items.some(item => item.isRefunded) && <span className="ml-1 text-[10px] text-orange-500">(Net)</span>}
+                                            </p>
                                         </div>
                                         <div>
                                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{isChinese ? '利润' : 'Profit'}</p>
@@ -611,31 +592,12 @@ export function OrderList() {
                 description={confirmModal.description}
             />
 
-            <Modal
-                isOpen={exportModal.isOpen}
-                onClose={() => setExportModal(prev => ({ ...prev, isOpen: false }))}
-                title={isChinese ? `导出 ${exportModal.format.toUpperCase()}` : `Export ${exportModal.format.toUpperCase()}`}
-            >
-                <div className="flex flex-col gap-4">
-                    <p className="text-sm text-slate-500">
-                        {isChinese ? '请选择需要导出的时间范围：' : 'Please select the date range to export:'}
-                    </p>
-                    <div className="grid grid-cols-2 gap-4">
-                        <Button variant="outline" className="h-12 border-slate-200 dark:border-white/10 hover:bg-primary/5 hover:text-primary transition-all" onClick={() => executeExport('week')}>
-                            {isChinese ? '本周' : 'This Week'}
-                        </Button>
-                        <Button variant="outline" className="h-12 border-slate-200 dark:border-white/10 hover:bg-primary/5 hover:text-primary transition-all" onClick={() => executeExport('month')}>
-                            {isChinese ? '本月' : 'This Month'}
-                        </Button>
-                        <Button variant="outline" className="h-12 border-slate-200 dark:border-white/10 hover:bg-primary/5 hover:text-primary transition-all" onClick={() => executeExport('year')}>
-                            {isChinese ? '本年' : 'This Year'}
-                        </Button>
-                        <Button className="h-12 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20" onClick={() => executeExport('all')}>
-                            {isChinese ? '全部时间' : 'All Time'}
-                        </Button>
-                    </div>
-                </div>
-            </Modal>
+            <DataManagementModal
+                isOpen={isDataModalOpen}
+                onClose={() => setIsDataModalOpen(false)}
+                mode={dataModalMode}
+                selectedIds={selectedIds}
+            />
 
             {/* Batch Action Bar */}
             <AnimatePresence>

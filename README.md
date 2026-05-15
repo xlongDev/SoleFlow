@@ -1,6 +1,6 @@
 # SoleFlow - Premium Order Management System
 
-[中文](#soleflow---高端订单管理系统) | [English](#soleflow---premium-order-management-system)
+[中文](#soleflow---订单管理系统) | [English](#soleflow---premium-order-management-system)
 
 ---
 
@@ -51,7 +51,7 @@ SoleFlow is a modern, high-performance order management system designed for smal
 
 ---
 
-## SoleFlow - 高端订单管理系统
+## SoleFlow - 订单管理系统
 
 SoleFlow 是一款专为小微企业和独立卖家设计的现代、高性能订单管理系统。系统专注于美学设计和用户体验，提供从订单录入、发货跟踪到数据分析的无缝流程。
 

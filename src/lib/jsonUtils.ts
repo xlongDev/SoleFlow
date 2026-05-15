@@ -56,8 +56,12 @@ export const exportToJson = async (orders: Order[], language: string = 'en', fil
 
     const a = document.createElement('a');
     a.href = url;
-    const tag = filenameTag ? `_${filenameTag}` : '';
-    a.download = `SoleFlow_${isChinese ? '订单' : 'Orders'}${tag}_${format(new Date(), 'yyyyMMdd_HHmm')}.json`;
+    const tag = filenameTag || (isChinese ? '全部' : 'all');
+    const dateValues = orders.map(order => new Date(order.createdAt).getTime()).filter(value => !Number.isNaN(value));
+    const minDate = dateValues.length > 0 ? format(new Date(Math.min(...dateValues)), 'yyyyMMdd') : format(new Date(), 'yyyyMMdd');
+    const maxDate = dateValues.length > 0 ? format(new Date(Math.max(...dateValues)), 'yyyyMMdd') : format(new Date(), 'yyyyMMdd');
+    const countTag = `${orders.length}${isChinese ? '单' : 'orders'}`;
+    a.download = `${isChinese ? '订单导出' : 'order-export'}_${tag}_${minDate}-${maxDate}_${countTag}.json`;
     a.click();
     URL.revokeObjectURL(url);
 };
@@ -67,10 +71,12 @@ export const importFromJson = (file: File): Promise<Order[]> => {
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                const content = e.target?.result as string;
-                const orders = JSON.parse(content);
-                if (Array.isArray(orders)) {
-                    resolve(orders);
+                const content = (e.target?.result as string).replace(/^\uFEFF/, '');
+                const parsed = JSON.parse(content);
+                if (Array.isArray(parsed)) {
+                    resolve(parsed);
+                } else if (parsed && Array.isArray(parsed.orders)) {
+                    resolve(parsed.orders);
                 } else {
                     reject(new Error('Invalid JSON format: expected an array of orders'));
                 }

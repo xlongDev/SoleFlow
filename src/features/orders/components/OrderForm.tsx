@@ -3,14 +3,19 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useOrderStore } from '@/store/useOrderStore'
 import { format } from 'date-fns'
 import { SIZE_MAPPING, COURIER_OPTIONS, CLOTHING_SIZE_MAPPING, PANTS_SIZE_MAPPING } from '@/types/order'
-import type { OrderItem, ItemCategory } from '@/types/order'
+import type { OrderItem, ItemCategory, Order } from '@/types/order'
 import { Button, GlassCard } from '@/components/ui/LayoutPrimitives'
 import { Input, Label, Select } from '@/components/ui/FormPrimitives'
-import { Upload, ArrowRight, ShoppingBag, Plus, Trash2, User as UserIcon, MapPin, Phone, Sparkles, TrendingUp, Mic, Loader2 } from 'lucide-react'
+import { Upload, ArrowRight, ShoppingBag, Plus, Trash2, User as UserIcon, MapPin, Phone, Sparkles, TrendingUp, Mic, Loader2, CheckCircle2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useConfigStore } from '@/store/useConfigStore'
 import { cn } from '@/lib/utils'
+import { compressImage, fileToBase64 } from '@/lib/imageCompression'
+import { RotateCcw, ChevronDown, ChevronUp, Copy as CopyIcon } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Modal } from '@/components/ui/Modal'
+import { computeSmartRecognize, type SmartRecognizePreview } from '@/features/orders/utils/smartRecognize'
 
 interface OrderFormProps {
     orderId?: string
@@ -22,7 +27,7 @@ export function OrderForm({ orderId }: OrderFormProps) {
     const navigate = useNavigate()
     const location = useLocation()
     const { orders, addOrder, updateOrder } = useOrderStore()
-    const { suppliers } = useConfigStore()
+    const { suppliers, imageCompressionEnabled, imageCompressionQuality } = useConfigStore()
     const fileInputRefs = useRef<(HTMLInputElement | null)[]>([])
     const trackingInputRef = useRef<HTMLInputElement>(null)
     const [isListening, setIsListening] = useState(false)
@@ -56,6 +61,9 @@ export function OrderForm({ orderId }: OrderFormProps) {
         existingOrder?.shippedAt ? format(new Date(existingOrder.shippedAt), "yyyy-MM-dd'T'HH:mm") : ''
     )
     const [isDragging, setIsDragging] = useState<number | null>(null)
+    const [recognizePreview, setRecognizePreview] = useState<SmartRecognizePreview | null>(null)
+    const [showAftersales, setShowAftersales] = useState(false)
+    const { supplierAftercare } = useConfigStore()
 
     useEffect(() => {
         const params = new URLSearchParams(location.search)
@@ -83,29 +91,111 @@ export function OrderForm({ orderId }: OrderFormProps) {
         setItems(newItems)
     }
 
-    const processFile = (index: number, file: File) => {
+    const processFile = async (index: number, file: File) => {
         if (file && file.type.startsWith('image/')) {
-            const reader = new FileReader()
-            reader.onloadend = () => {
-                handleItemChange(index, 'image', reader.result as string)
+            try {
+                let fileToProcess = file;
+                if (imageCompressionEnabled) {
+                    fileToProcess = await compressImage(file, {
+                        maxSizeMB: 0.2,
+                        maxWidthOrHeight: 800,
+                        useWebWorker: true,
+                        initialQuality: imageCompressionQuality
+                    }) as File;
+                }
+                const base64 = await fileToBase64(fileToProcess);
+                handleItemChange(index, 'image', base64);
+            } catch (error) {
+                console.error('Error processing image:', error);
+                toast.error(isChinese ? '图片处理失败' : 'Image processing failed');
             }
-            reader.readAsDataURL(file)
         } else {
             toast.error(isChinese ? '请上传图片文件' : 'Please upload an image file')
         }
     }
 
+    const processFiles = async (files: FileList | File[]) => {
+        const fileArray = Array.from(files).filter(f => f.type.startsWith('image/'))
+        if (fileArray.length === 0) return
+
+        toast.loading(isChinese ? '正在处理图片...' : 'Processing images...', { id: 'image-upload' })
+
+        try {
+            const newItems = [...items]
+            for (let i = 0; i < fileArray.length; i++) {
+                const file = fileArray[i]
+                let fileToProcess = file
+                if (imageCompressionEnabled) {
+                    fileToProcess = await compressImage(file, {
+                        maxSizeMB: 0.2,
+                        maxWidthOrHeight: 800,
+                        useWebWorker: true,
+                        initialQuality: imageCompressionQuality
+                    }) as File
+                }
+                const base64 = await fileToBase64(fileToProcess)
+                
+                if (i === 0 && !items[0].image && items[0].name === '') {
+                    // Fill first item if empty
+                    newItems[0] = { ...newItems[0], image: base64 }
+                } else {
+                    // Add new item
+                    newItems.push({
+                        name: '', 
+                        size: items[items.length - 1]?.size || '42', 
+                        price: items[items.length - 1]?.price || 0, 
+                        costPrice: items[items.length - 1]?.costPrice || 0, 
+                        quantity: 1, 
+                        image: base64, 
+                        category: items[items.length - 1]?.category || 'shoes'
+                    })
+                }
+            }
+            setItems(newItems)
+            toast.success(isChinese ? `成功上传 ${fileArray.length} 张图片` : `Successfully uploaded ${fileArray.length} images`, { id: 'image-upload' })
+        } catch (error) {
+            console.error('Error processing images:', error)
+            toast.error(isChinese ? '图片处理失败' : 'Image processing failed', { id: 'image-upload' })
+        }
+    }
+
     const handleImageUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (file) processFile(index, file)
+        const files = e.target.files
+        if (files) {
+            if (files.length > 1) {
+                processFiles(files)
+            } else {
+                processFile(index, files[0])
+            }
+        }
+    }
+
+    const handlePaste = (index: number, e: React.ClipboardEvent) => {
+        const items = e.clipboardData?.items
+        if (items) {
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const file = items[i].getAsFile()
+                    if (file) {
+                        processFile(index, file)
+                    }
+                }
+            }
+        }
     }
 
     const handleDrop = (index: number, e: React.DragEvent) => {
         e.preventDefault()
         e.stopPropagation()
         setIsDragging(null)
-        const file = e.dataTransfer.files?.[0]
-        if (file) processFile(index, file)
+        const files = e.dataTransfer.files
+        if (files) {
+            if (files.length > 1) {
+                processFiles(files)
+            } else if (files.length === 1) {
+                processFile(index, files[0])
+            }
+        }
     }
 
     const handleDragOver = (index: number, e: React.DragEvent) => {
@@ -158,100 +248,82 @@ export function OrderForm({ orderId }: OrderFormProps) {
 
     const handleSmartRecognize = () => {
         if (!smartInput.trim()) return
-
-        // Simple regex-based recognition
-        const phoneRegex = /(1[3-9]\d{9})/
-        const phoneMatch = smartInput.match(phoneRegex)
-
-        // Shoe size recognition (e.g., 42, 42.5, 42码, Size 42, EUR 42, US 9)
-        // Look for numbers 30-50 (EUR) or 3-13 (US), optionally with .5
-        const sizeRegex = /(?:size|eur|us|尺码|码)?\s*((?:3[0-9]|4[0-9]|50|[3-9]|1[0-3])(?:\.5)?)\s*(?:码|code|size|eur|us)?/i
-        const sizeMatch = smartInput.match(sizeRegex)
-
-        let recognizedSize = ''
-        if (sizeMatch && sizeMatch[1]) {
-            // Validate if it's a valid size in our mapping
-            const cleanSize = sizeMatch[1]
-            // Check if it matches a EUR size directly
-            const eurMatch = SIZE_MAPPING.find(s => s.eur === cleanSize)
-            // Check if it matches a US size
-            const usMatch = SIZE_MAPPING.find(s => s.us === cleanSize)
-
-            if (eurMatch) {
-                recognizedSize = eurMatch.eur
-            } else if (usMatch) {
-                recognizedSize = usMatch.eur // Convert to EUR as internal standard
-            }
-        }
-
-        // Split by common delimiters
-        const parts = smartInput.split(/[\s,，、\n]+/)
-
-        let name = ''
-        let phone = phoneMatch ? phoneMatch[0] : ''
-        let address = ''
-
-        // Try to identify name (usually short, before phone or address, 2-4 chars, no digits/special chars)
-        const namePart = parts.find(p => p.length >= 2 && p.length <= 4 && !/\d/.test(p) && !/size|eur|码|code/i.test(p))
-        if (namePart) name = namePart
-
-        // Infer address (rest of the text that isn't name, phone, or size)
-        address = smartInput
-            .replace(name, '')
-            .replace(phone, '')
-            .replace(sizeMatch ? sizeMatch[0] : '', '')
-            .split(/[\s,，、\n]+/)
-            .filter(p => p.length > 2)
-            .join(' ')
-            .trim()
-
-        setRecipient({
-            name: name || recipient.name,
-            phone: phone || recipient.phone,
-            address: address || recipient.address
+        const preview = computeSmartRecognize(smartInput, suppliers, {
+            recipient,
+            items,
+            shipping,
+            supplier
         })
+        if (!preview) return
+        setRecognizePreview(preview)
+    }
 
-        if (recognizedSize && items.length > 0) {
-            // Update the first item's size if recognized
-            handleItemChange(0, 'size', recognizedSize)
-        }
-
+    const applyRecognizePreview = () => {
+        if (!recognizePreview) return
+        setRecipient(recognizePreview.recipient)
+        setItems(recognizePreview.items)
+        setShipping(recognizePreview.shipping)
+        setSupplier(recognizePreview.supplier)
         setSmartInput('')
-        toast.success(isChinese ? '识别成功' : 'Recognition successful')
+        setRecognizePreview(null)
+        toast.success(
+            recognizePreview.multiItemParsed
+                ? (isChinese ? `已应用 ${recognizePreview.items.length} 个商品` : `Applied ${recognizePreview.items.length} items`)
+                : (isChinese ? '识别结果已应用到表单' : 'Recognition applied to the form')
+        )
     }
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
+        const createdAtDate = customCreatedAt ? new Date(customCreatedAt) : new Date()
+        const safeCreatedAt = Number.isNaN(createdAtDate.getTime()) ? new Date() : createdAtDate
 
-        const orderData: any = {
+        const shippedAtDate = shippedAt ? new Date(shippedAt) : null
+        const safeShippedAt = shippedAtDate && !Number.isNaN(shippedAtDate.getTime()) ? shippedAtDate.toISOString() : undefined
+
+        const normalizedItems = (Array.isArray(items) ? items : []).map(item => ({
+            ...item,
+            name: String(item?.name || '').trim(),
+            image: String(item?.image || ''),
+            size: String(item?.size || '42'),
+            price: Number(item?.price || 0),
+            costPrice: Number(item?.costPrice || 0),
+            quantity: Math.max(1, Number(item?.quantity || 1)),
+            category: item?.category || 'shoes'
+        })).filter(item => item.name)
+
+        if (normalizedItems.length === 0) {
+            toast.error(isChinese ? '请至少填写一个商品名称' : 'Please provide at least one item name')
+            return
+        }
+
+        const orderData: Partial<Order> = {
             customer: recipient,
             remarks,
             supplier,
-            items: items.map(item => ({
-                ...item,
-                price: Number(item.price),
-                costPrice: Number(item.costPrice || 0),
-                quantity: Number(item.quantity)
-            })),
+            items: normalizedItems,
             shipping: {
                 ...shipping,
-                trackingNumber: shipping.trackingNumber.trim()
+                trackingNumber: String(shipping.trackingNumber || '').trim()
             },
-            status: shipping.status,
-            shippedAt: shippedAt ? new Date(shippedAt).toISOString() : undefined
+            shippedAt: safeShippedAt
         }
 
-        // Logic for shippedAt handled by the field directly now
-
         if (orderId) {
+            if (!existingOrder) {
+                toast.error(isChinese ? '未找到订单，请返回列表重试' : 'Order not found, please retry from list')
+                return
+            }
             updateOrder(orderId, orderData)
+            toast.success(isChinese ? '订单已更新' : 'Order updated')
         } else {
             addOrder({
                 ...orderData,
                 id: crypto.randomUUID(),
-                createdAt: new Date(customCreatedAt).toISOString(),
+                createdAt: safeCreatedAt.toISOString(),
                 updatedAt: new Date().toISOString()
-            } as any)
+            } as Order)
+            toast.success(isChinese ? '订单已创建' : 'Order created')
         }
 
         navigate('/orders')
@@ -273,7 +345,7 @@ export function OrderForm({ orderId }: OrderFormProps) {
                     <div className="flex gap-4 items-stretch">
                         <textarea
                             className="flex min-h-[80px] flex-1 rounded-2xl border border-primary/20 bg-white/50 dark:bg-slate-900/50 px-4 py-3 text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-all backdrop-blur-sm shadow-sm resize-none"
-                            placeholder={isChinese ? "粘贴姓名、电话、地址，点击识别..." : "Paste name, phone, address and click recognize..."}
+                            placeholder={isChinese ? "粘贴文本后点「识别」，在预览中确认再写入表单..." : "Paste text, tap Recognize, confirm in preview..."}
                             value={smartInput}
                             onChange={e => setSmartInput(e.target.value)}
                         />
@@ -294,7 +366,7 @@ export function OrderForm({ orderId }: OrderFormProps) {
                                 onClick={handleSmartRecognize}
                                 className="h-full px-8 rounded-2xl font-bold shadow-lg shadow-primary/20"
                             >
-                                {t('newOrder.recognize')}
+                                {isChinese ? '识别并预览' : 'Recognize'}
                             </Button>
                         </div>
                     </div>
@@ -342,17 +414,71 @@ export function OrderForm({ orderId }: OrderFormProps) {
                         />
                     </div>
 
-                    <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-white/5">
-                        <Label className="flex items-center gap-2">
-                            <TrendingUp size={14} className="text-primary" />
-                            {isChinese ? '供应商' : 'Supplier'}
-                        </Label>
-                        <Select value={supplier} onChange={e => setSupplier(e.target.value)}>
-                            {suppliers.map(s => (
-                                <option key={s} value={s}>{s}</option>
-                            ))}
-                        </Select>
+                    <div className="space-y-4">
+                        <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-white/5">
+                            <Label className="flex items-center gap-2">
+                                <TrendingUp size={14} className="text-primary" />
+                                {isChinese ? '供应商' : 'Supplier'}
+                            </Label>
+                            <Select value={supplier} onChange={e => { setSupplier(e.target.value); setShowAftersales(false); }}>
+                                {suppliers.map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </Select>
+                        </div>
+
+                        {supplier && (
+                            <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-slate-900/30 overflow-hidden transition-all">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAftersales(!showAftersales)}
+                                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <TrendingUp size={14} className="text-primary" />
+                                        {isChinese ? '查看售后信息' : 'View After-sales Info'}
+                                    </div>
+                                    {showAftersales ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                </button>
+                                
+                                {showAftersales && (
+                                    <div className="px-4 py-4 space-y-4 border-t border-slate-200 dark:border-white/10 bg-white/40 dark:bg-slate-900/40">
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{isChinese ? '退货地址' : 'Return Address'}</p>
+                                                <p className="text-sm whitespace-pre-wrap">{supplierAftercare[supplier]?.refundAddress || '—'}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{isChinese ? '售后联系' : 'Contact'}</p>
+                                                <p className="text-sm">{supplierAftercare[supplier]?.refundContact || '—'}</p>
+                                            </div>
+                                            {supplierAftercare[supplier]?.refundNotes && (
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{isChinese ? '备注' : 'Notes'}</p>
+                                                    <p className="text-xs text-slate-500 italic">{supplierAftercare[supplier].refundNotes}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            className="w-full h-9 rounded-xl gap-2 font-bold"
+                                            onClick={() => {
+                                                const care = supplierAftercare[supplier]
+                                                const text = `${isChinese ? '退货地址' : 'Address'}: ${care?.refundAddress || ''}\n${isChinese ? '联系方式' : 'Contact'}: ${care?.refundContact || ''}\n${care?.refundNotes ? `${isChinese ? '备注' : 'Notes'}: ${care.refundNotes}` : ''}`
+                                                navigator.clipboard.writeText(text)
+                                                toast.success(isChinese ? '售后信息已复制' : 'After-sales info copied')
+                                            }}
+                                        >
+                                            <CopyIcon size={14} /> {isChinese ? '复制售后信息' : 'Copy Info'}
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
+
                     <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-white/5">
                         <Label className="flex items-center gap-2">
                             <TrendingUp size={14} className="text-primary" />
@@ -392,7 +518,25 @@ export function OrderForm({ orderId }: OrderFormProps) {
                                     <Trash2 size={16} />
                                 </button>
                             )}
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+                            <div className="absolute -top-3 right-8 z-10">
+                                <button
+                                    type="button"
+                                    onClick={() => handleItemChange(index, 'isRefunded', !item.isRefunded)}
+                                    className={cn(
+                                        "h-8 px-3 rounded-full flex items-center gap-1.5 shadow-lg border text-xs font-bold transition-all",
+                                        item.isRefunded
+                                            ? "bg-red-500 text-white border-red-400 hover:bg-red-600"
+                                            : "bg-white dark:bg-slate-900 text-slate-600 border-slate-200 dark:border-slate-700 hover:border-red-300 hover:text-red-500"
+                                    )}
+                                    title={item.isRefunded ? t('orders.refunded') : t('orders.refund')}
+                                >
+                                    {item.isRefunded ? <CheckCircle2 size={14} /> : <RotateCcw size={14} />}
+                                    <span>{item.isRefunded ? t('orders.refunded') : t('orders.refund')}</span>
+                                </button>
+                            </div>
+
+                            <div className={cn("grid grid-cols-1 lg:grid-cols-12 gap-8 transition-opacity", item.isRefunded && "opacity-50 grayscale-[0.5]")}>
                                 {/* Image Upload */}
                                 <div className="lg:col-span-4 space-y-4">
                                     <div
@@ -400,8 +544,16 @@ export function OrderForm({ orderId }: OrderFormProps) {
                                         onDragOver={(e) => handleDragOver(index, e)}
                                         onDragLeave={handleDragLeave}
                                         onDrop={(e) => handleDrop(index, e)}
+                                        onPaste={(e) => handlePaste(index, e)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                fileInputRefs.current[index]?.click();
+                                            }
+                                        }}
+                                        tabIndex={0}
                                         className={cn(
-                                            "aspect-[4/3] rounded-2xl border-2 border-dashed transition-all overflow-hidden relative group cursor-pointer flex flex-col items-center justify-center",
+                                            "aspect-[4/3] rounded-2xl border-2 border-dashed transition-all overflow-hidden relative group cursor-pointer flex flex-col items-center justify-center focus:outline-none focus:ring-2 focus:ring-primary/50",
                                             isDragging === index
                                                 ? "border-primary bg-primary/5 scale-[0.98] shadow-inner"
                                                 : "border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 hover:border-primary/50"
@@ -448,6 +600,7 @@ export function OrderForm({ orderId }: OrderFormProps) {
                                             ref={el => { fileInputRefs.current[index] = el }}
                                             className="hidden"
                                             accept="image/*"
+                                            multiple
                                             onChange={e => handleImageUpload(index, e)}
                                         />
                                     </div>
@@ -543,6 +696,31 @@ export function OrderForm({ orderId }: OrderFormProps) {
                                             placeholder={t('newOrder.placeholderPrice')}
                                         />
                                     </div>
+                                    {item.isRefunded && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            className="sm:col-span-2 space-y-2 pt-2 border-t border-red-500/20"
+                                        >
+                                            <Label className="text-red-500 flex items-center gap-2">
+                                                <RotateCcw size={14} />
+                                                {t('orders.refundReason')}
+                                            </Label>
+                                            <Select 
+                                                value={item.refundReason || ''} 
+                                                onChange={e => handleItemChange(index, 'refundReason', e.target.value)}
+                                                className="border-red-500/30 focus:ring-red-500/20"
+                                            >
+                                                <option value="">{isChinese ? '-- 请选择退款原因 --' : '-- Select Reason --'}</option>
+                                                <option value="size_issue">{t('orders.refundReasons.size_issue')}</option>
+                                                <option value="quality_issue">{t('orders.refundReasons.quality_issue')}</option>
+                                                <option value="out_of_stock">{t('orders.refundReasons.out_of_stock')}</option>
+                                                <option value="customer_change">{t('orders.refundReasons.customer_change')}</option>
+                                                <option value="shipping_delay">{t('orders.refundReasons.shipping_delay')}</option>
+                                                <option value="other">{t('orders.refundReasons.other')}</option>
+                                            </Select>
+                                        </motion.div>
+                                    )}
                                 </div>
                             </div>
                         </GlassCard>
@@ -646,6 +824,59 @@ export function OrderForm({ orderId }: OrderFormProps) {
                     </div>
                 </div>
             </div>
+
+            <Modal
+                isOpen={!!recognizePreview}
+                onClose={() => setRecognizePreview(null)}
+                title={isChinese ? '识别结果预览' : 'Recognition preview'}
+                maxWidth="max-w-3xl"
+            >
+                {recognizePreview && (
+                    <div className="space-y-6">
+                        <p className="text-sm text-slate-500">
+                            {isChinese ? '请核对以下信息，确认后将写入当前表单。' : 'Review the parsed data. Confirm to apply it to the form.'}
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-4 space-y-2">
+                                <p className="text-xs font-bold text-slate-400 uppercase">{isChinese ? '收件人' : 'Recipient'}</p>
+                                <p><span className="text-slate-500">{isChinese ? '姓名' : 'Name'}: </span>{recognizePreview.recipient.name || '—'}</p>
+                                <p><span className="text-slate-500">{isChinese ? '电话' : 'Phone'}: </span>{recognizePreview.recipient.phone || '—'}</p>
+                                <p className="whitespace-pre-wrap"><span className="text-slate-500">{isChinese ? '地址' : 'Address'}: </span>{recognizePreview.recipient.address || '—'}</p>
+                            </div>
+                            <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-4 space-y-2">
+                                <p className="text-xs font-bold text-slate-400 uppercase">{isChinese ? '物流与供应商' : 'Shipping & supplier'}</p>
+                                <p><span className="text-slate-500">{isChinese ? '快递' : 'Courier'}: </span>{recognizePreview.shipping.company}</p>
+                                <p><span className="text-slate-500">{isChinese ? '单号' : 'Tracking'}: </span>{recognizePreview.shipping.trackingNumber || '—'}</p>
+                                <p><span className="text-slate-500">{isChinese ? '状态' : 'Status'}: </span>{recognizePreview.shipping.status}</p>
+                                <p><span className="text-slate-500">{isChinese ? '供应商' : 'Supplier'}: </span>{recognizePreview.supplier}</p>
+                            </div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden">
+                            <div className="bg-slate-50 dark:bg-slate-800/50 px-4 py-2 text-xs font-bold text-slate-500 uppercase">
+                                {isChinese ? `商品（${recognizePreview.items.length}）` : `Items (${recognizePreview.items.length})`}
+                            </div>
+                            <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-white/10">
+                                {recognizePreview.items.map((it, idx) => (
+                                    <div key={idx} className="px-4 py-3 grid grid-cols-12 gap-2 text-sm">
+                                        <div className="col-span-12 sm:col-span-5 font-medium truncate">{it.name}</div>
+                                        <div className="col-span-4 sm:col-span-2">{isChinese ? `${it.size} 码` : it.size}</div>
+                                        <div className="col-span-4 sm:col-span-2">×{it.quantity}</div>
+                                        <div className="col-span-4 sm:col-span-3 text-primary font-bold">¥{it.price}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 pt-2">
+                            <Button type="button" variant="ghost" className="rounded-xl" onClick={() => setRecognizePreview(null)}>
+                                {isChinese ? '取消' : 'Cancel'}
+                            </Button>
+                            <Button type="button" className="rounded-xl px-8" onClick={applyRecognizePreview}>
+                                {isChinese ? '确认写入表单' : 'Apply to form'}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </form>
     )
 }

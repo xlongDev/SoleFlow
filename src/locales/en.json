@@ -23,7 +23,12 @@
         "salesTrend": "Sales Trends (Last 7 Days)",
         "todayOrdersSub": "{{count}} orders today",
         "monthlyOrdersSub": "{{count}} orders this month",
-        "lifetimeOrdersSub": "Lifetime orders"
+        "lifetimeOrdersSub": "Lifetime orders",
+        "todayRevenue": "Today's Revenue",
+        "monthlyRevenue": "Monthly Revenue",
+        "todayProfit": "Today's Profit",
+        "monthlyProfit": "Monthly Profit",
+        "totalProfit": "Total Profit"
     },
     "orders": {
         "title": "Orders",
@@ -49,7 +54,18 @@
         "view": "View",
         "editTitle": "Edit Order",
         "editSubtitle": "Update shipment details.",
-        "size": "Size"
+        "size": "Size",
+        "refund": "Refund",
+        "refunded": "Refunded",
+        "refundReason": "Refund Reason",
+        "refundReasons": {
+            "size_issue": "Size Issue",
+            "out_of_stock": "Out of Stock",
+            "quality_issue": "Quality Issue",
+            "customer_change": "Customer Changed Mind",
+            "shipping_delay": "Shipping Delay",
+            "other": "Other"
+        }
     },
     "newOrder": {
         "title": "New Order",
@@ -142,6 +158,12 @@
         "posterStyleBlueprint": "Blueprint",
         "brandName": "Brand Name",
         "brandNamePlaceholder": "Enter your brand name",
+        "imageSettings": "Image Settings",
+        "imageCompression": "Image Compression",
+        "imageCompressionDesc": "Automatically compress uploaded images to save space.",
+        "compressionQuality": "Compression Quality",
+        "maxImageWidth": "Max Width (px)",
+        "excludeRefunded": "Exclude refunded items in export",
         "settingsManagement": "Settings Management",
         "exportSettings": "Export Settings",
         "importSettings": "Import Settings",
@@ -185,6 +207,8 @@
         "profitMargin": "Avg. Profit Margin",
         "salesTrends": "Sales Trends",
         "revenueTrends": "Monthly Revenue",
-        "marketingAnalysis": "Marketing Analysis"
+        "marketingAnalysis": "Daily Marketing Analysis",
+        "yearlyMarketingAnalysis": "Yearly Marketing Analysis",
+        "monthlyMarketingAnalysis": "Monthly Marketing Analysis"
     }
 }

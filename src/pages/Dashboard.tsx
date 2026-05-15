@@ -8,6 +8,9 @@ import { RegionAnalysisChart } from '@/features/dashboard/components/RegionAnaly
 import { ProfitChart } from '@/features/dashboard/components/ProfitChart'
 import { ShippingSpeedChart } from '@/features/dashboard/components/ShippingSpeedChart'
 import { MarketingChart } from '@/features/dashboard/components/MarketingChart'
+import { RefundChart } from '@/features/dashboard/components/RefundChart'
+import { MonthlyMarketingChart } from '@/features/dashboard/components/MonthlyMarketingChart'
+import { YearlyMarketingChart } from '@/features/dashboard/components/YearlyMarketingChart'
 import { useTranslation } from 'react-i18next'
 import { useOrderStore } from '@/store/useOrderStore'
 import { Select } from '@/components/ui/FormPrimitives'
@@ -50,16 +53,28 @@ export function Dashboard() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="grid grid-cols-1 lg:grid-cols-3 gap-8"
             >
+                <div className="lg:col-span-1">
+                    <MarketingChart />
+                </div>
+                <div className="lg:col-span-1">
+                    <MonthlyMarketingChart />
+                </div>
+                <div className="lg:col-span-1">
+                    <YearlyMarketingChart />
+                </div>
                 <div className="lg:col-span-2">
                     <ProfitChart />
                 </div>
                 <div className="lg:col-span-1">
                     <StatusPieChart />
                 </div>
+                <div className="lg:col-span-1">
+                    <RefundChart />
+                </div>
                 <div className="lg:col-span-2">
                     <SalesChart />
                 </div>
-                <div>
+                <div className="lg:col-span-1">
                     <TopStylesChart />
                 </div>
                 <div className="lg:col-span-2">
@@ -70,9 +85,6 @@ export function Dashboard() {
                 </div>
                 <div className="lg:col-span-2">
                     <YearlyRevenueChart />
-                </div>
-                <div className="lg:col-span-1">
-                    <MarketingChart />
                 </div>
                 <div className="lg:col-span-3">
                     <SizeAnalysisChart />
