@@ -28,7 +28,7 @@ function App() {
           }
         }}
       />
-      <BrowserRouter>
+      <BrowserRouter basename="/SoleFlow/">
         <Routes>
           <Route element={<DashboardLayout />}>
             <Route path="/" element={<Dashboard />} />
