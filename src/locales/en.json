@@ -65,6 +65,19 @@
             "customer_change": "Customer Changed Mind",
             "shipping_delay": "Shipping Delay",
             "other": "Other"
+        },
+        "exchange": "Exchange",
+        "exchanged": "Exchanged",
+        "exchangeReason": "Exchange Reason",
+        "exchangeSize": "Exchanged Size",
+        "exchangeCost": "Exchange Cost",
+        "returnCost": "Return Cost",
+        "exchangeReasons": {
+            "size_issue": "Size Issue",
+            "quality_issue": "Quality Issue",
+            "customer_change": "Customer Changed Mind",
+            "shipping_delay": "Shipping Delay",
+            "other": "Other"
         }
     },
     "newOrder": {
@@ -162,6 +175,9 @@
         "imageCompression": "Image Compression",
         "imageCompressionDesc": "Automatically compress uploaded images to save space.",
         "compressionQuality": "Compression Quality",
+        "posterCompression": "Compress downloaded posters",
+        "posterCompressionDesc": "Automatically compress downloaded order posters to reduce file size.",
+        "posterCompressionQuality": "Poster Compression Quality",
         "maxImageWidth": "Max Width (px)",
         "excludeRefunded": "Exclude refunded items in export",
         "settingsManagement": "Settings Management",
@@ -209,6 +225,10 @@
         "revenueTrends": "Monthly Revenue",
         "marketingAnalysis": "Daily Marketing Analysis",
         "yearlyMarketingAnalysis": "Yearly Marketing Analysis",
-        "monthlyMarketingAnalysis": "Monthly Marketing Analysis"
+        "monthlyMarketingAnalysis": "Monthly Marketing Analysis",
+        "aftersalesExpenseAnalysis": "Return & Exchange Expenses",
+        "returnExpense": "Return Expense",
+        "exchangeExpense": "Exchange Expense",
+        "totalAftersalesExpense": "Total After-sales Expense"
     }
 }

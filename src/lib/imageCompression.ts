@@ -5,21 +5,42 @@ export interface CompressionOptions {
     maxWidthOrHeight?: number;
     useWebWorker?: boolean;
     initialQuality?: number;
+    onProgress?: (progress: number) => void;
 }
 
 export const compressImage = async (file: File, options: CompressionOptions = {}) => {
+    const { onProgress, ...compressionOptions } = options;
     const defaultOptions = {
         maxSizeMB: 1,
         maxWidthOrHeight: 1280,
         useWebWorker: true,
-        ...options
+        ...compressionOptions
     };
 
     try {
+        // Simulate progress since browser-image-compression doesn't natively support it
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += 10;
+            if (progress > 90) progress = 90;
+            if (onProgress) {
+                onProgress(progress);
+            }
+        }, 100);
+
         const compressedFile = await imageCompression(file, defaultOptions);
+
+        clearInterval(progressInterval);
+        if (onProgress) {
+            onProgress(100);
+        }
+
         return compressedFile;
     } catch (error) {
         console.error('Image compression failed:', error);
+        if (onProgress) {
+            onProgress(100);
+        }
         return file; // Return original file if compression fails
     }
 };

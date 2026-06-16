@@ -28,6 +28,8 @@ export function SettingsPage() {
         supplierAftercare, updateSupplierAftercare,
         imageCompressionEnabled, setImageCompressionEnabled,
         imageCompressionQuality, setImageCompressionQuality,
+        posterCompressionEnabled, setPosterCompressionEnabled,
+        posterCompressionQuality, setPosterCompressionQuality,
         maxImageWidth, setMaxImageWidth
     } = useConfigStore()
     const [isDataModalOpen, setIsDataModalOpen] = useState(false)
@@ -475,58 +477,105 @@ export function SettingsPage() {
                         </h2>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-base font-bold text-slate-700 dark:text-slate-300">
-                                        {t('settings.imageCompression')}
-                                    </Label>
-                                    <button
-                                        onClick={() => setImageCompressionEnabled(!imageCompressionEnabled)}
-                                        className={cn(
-                                            "relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none",
-                                            imageCompressionEnabled ? "bg-primary" : "bg-slate-200 dark:bg-slate-700"
-                                        )}
-                                    >
-                                        <span
+                            {/* Style Photo Compression */}
+                            <div className="space-y-6 bg-slate-50 dark:bg-slate-800/20 p-6 rounded-[2rem] border border-slate-150 dark:border-white/5">
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-base font-bold text-slate-700 dark:text-slate-300">
+                                            {t('settings.imageCompression')}
+                                        </Label>
+                                        <button
+                                            onClick={() => setImageCompressionEnabled(!imageCompressionEnabled)}
                                             className={cn(
-                                                "inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md",
-                                                imageCompressionEnabled ? "translate-x-6" : "translate-x-1"
+                                                "relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none",
+                                                imageCompressionEnabled ? "bg-primary" : "bg-slate-200 dark:bg-slate-700"
                                             )}
-                                        />
-                                    </button>
+                                        >
+                                            <span
+                                                className={cn(
+                                                    "inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md",
+                                                    imageCompressionEnabled ? "translate-x-6" : "translate-x-1"
+                                                )}
+                                            />
+                                        </button>
+                                    </div>
+                                    <p className="text-sm text-slate-500 leading-relaxed">{t('settings.imageCompressionDesc')}</p>
                                 </div>
-                                <p className="text-sm text-slate-500 leading-relaxed">{t('settings.imageCompressionDesc')}</p>
+
+                                {imageCompressionEnabled && (
+                                    <div className="space-y-6 pt-4 border-t border-slate-200/50 dark:border-white/5">
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between">
+                                                <Label className="text-sm font-bold text-slate-500 uppercase tracking-wider">{t('settings.compressionQuality')}</Label>
+                                                <span className="text-base font-black text-primary">{Math.round(imageCompressionQuality * 100)}%</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="0.1"
+                                                max="1.0"
+                                                step="0.05"
+                                                value={imageCompressionQuality}
+                                                onChange={(e) => setImageCompressionQuality(parseFloat(e.target.value))}
+                                                className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <Label className="text-sm font-bold text-slate-500 uppercase tracking-wider block">{t('settings.maxImageWidth')} (px)</Label>
+                                            <Input
+                                                type="number"
+                                                value={maxImageWidth}
+                                                onChange={(e) => setMaxImageWidth(parseInt(e.target.value) || 800)}
+                                                className="h-12 px-4 rounded-xl border-slate-200 dark:border-white/10 focus:ring-4 focus:ring-primary/10 transition-all font-semibold"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
-                            {imageCompressionEnabled && (
-                                <div className="space-y-8">
-                                    <div className="space-y-4">
+                            {/* Poster Compression */}
+                            <div className="space-y-6 bg-slate-50 dark:bg-slate-800/20 p-6 rounded-[2rem] border border-slate-150 dark:border-white/5">
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-base font-bold text-slate-700 dark:text-slate-300">
+                                            {t('settings.posterCompression')}
+                                        </Label>
+                                        <button
+                                            onClick={() => setPosterCompressionEnabled(!posterCompressionEnabled)}
+                                            className={cn(
+                                                "relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none",
+                                                posterCompressionEnabled ? "bg-primary" : "bg-slate-200 dark:bg-slate-700"
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    "inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md",
+                                                    posterCompressionEnabled ? "translate-x-6" : "translate-x-1"
+                                                )}
+                                            />
+                                        </button>
+                                    </div>
+                                    <p className="text-sm text-slate-500 leading-relaxed">{t('settings.posterCompressionDesc')}</p>
+                                </div>
+
+                                {posterCompressionEnabled && (
+                                    <div className="space-y-3 pt-4 border-t border-slate-200/50 dark:border-white/5">
                                         <div className="flex justify-between">
-                                            <Label className="text-sm font-bold text-slate-500 uppercase tracking-wider">{t('settings.compressionQuality')}</Label>
-                                            <span className="text-base font-black text-primary">{Math.round(imageCompressionQuality * 100)}%</span>
+                                            <Label className="text-sm font-bold text-slate-500 uppercase tracking-wider">{t('settings.posterCompressionQuality')}</Label>
+                                            <span className="text-base font-black text-primary">{Math.round(posterCompressionQuality * 100)}%</span>
                                         </div>
                                         <input
                                             type="range"
                                             min="0.1"
                                             max="1.0"
                                             step="0.05"
-                                            value={imageCompressionQuality}
-                                            onChange={(e) => setImageCompressionQuality(parseFloat(e.target.value))}
-                                            className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary"
+                                            value={posterCompressionQuality}
+                                            onChange={(e) => setPosterCompressionQuality(parseFloat(e.target.value))}
+                                            className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary"
                                         />
                                     </div>
-
-                                    <div className="space-y-4">
-                                        <Label className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2 block">{t('settings.maxImageWidth')} (px)</Label>
-                                        <Input
-                                            type="number"
-                                            value={maxImageWidth}
-                                            onChange={(e) => setMaxImageWidth(parseInt(e.target.value) || 800)}
-                                            className="h-14 px-6 rounded-2xl border-slate-200 dark:border-white/10 focus:ring-4 focus:ring-primary/10 transition-all font-semibold"
-                                        />
-                                    </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
                 </GlassCard>

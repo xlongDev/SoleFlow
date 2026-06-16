@@ -115,10 +115,11 @@ export function OrderPosterModal({ order, isOpen, onClose }: OrderPosterModalPro
         try {
             await new Promise(resolve => setTimeout(resolve, 300))
 
-            const dataUrl = await toPng(posterRef.current, {
+            const isDarkStyle = (['cyber', 'street', 'neon', 'minimalDark', 'grid'] as string[]).includes(config.style)
+            const pngDataUrl = await toPng(posterRef.current, {
                 quality: 1.0,
                 pixelRatio: 3,
-                backgroundColor: (['cyber', 'street', 'neon', 'minimalDark', 'grid'] as string[]).includes(config.style) ? '#000000' : '#ffffff',
+                backgroundColor: isDarkStyle ? '#000000' : '#ffffff',
                 width: posterRef.current.scrollWidth || config.posterSize?.width || 800,
                 height: posterRef.current.scrollHeight || config.posterSize?.height || 1000,
                 style: {
@@ -127,13 +128,39 @@ export function OrderPosterModal({ order, isOpen, onClose }: OrderPosterModalPro
                 }
             })
 
-            const link = document.createElement('a')
             const itemName = order.items[0]?.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'order'
             const customerName = order.customer.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()
             const timestamp = format(new Date(), 'yyyyMMdd_HHmm')
 
-            link.download = `SoleFlow_${itemName}_${customerName}_${config.style}_${timestamp}.png`
-            link.href = dataUrl
+            let finalDataUrl = pngDataUrl
+            let fileExt = 'png'
+
+            // Apply JPEG compression if enabled in global settings
+            if (globalConfig.posterCompressionEnabled) {
+                const quality = globalConfig.posterCompressionQuality ?? 0.85
+                await new Promise<void>((resolve, reject) => {
+                    const img = new Image()
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas')
+                        canvas.width = img.naturalWidth
+                        canvas.height = img.naturalHeight
+                        const ctx = canvas.getContext('2d')
+                        if (!ctx) { resolve(); return }
+                        ctx.fillStyle = isDarkStyle ? '#000000' : '#ffffff'
+                        ctx.fillRect(0, 0, canvas.width, canvas.height)
+                        ctx.drawImage(img, 0, 0)
+                        finalDataUrl = canvas.toDataURL('image/jpeg', quality)
+                        fileExt = 'jpg'
+                        resolve()
+                    }
+                    img.onerror = reject
+                    img.src = pngDataUrl
+                })
+            }
+
+            const link = document.createElement('a')
+            link.download = `SoleFlow_${itemName}_${customerName}_${config.style}_${timestamp}.${fileExt}`
+            link.href = finalDataUrl
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)
@@ -573,6 +600,31 @@ export function OrderPosterModal({ order, isOpen, onClose }: OrderPosterModalPro
                                 </span>
                             )}
                         </Button>
+
+                        {/* Compression info badge */}
+                        <div className={cn(
+                            "flex items-center justify-between px-3 py-2 rounded-xl text-[11px] font-bold border",
+                            globalConfig.posterCompressionEnabled
+                                ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                : "bg-slate-100 dark:bg-slate-800/60 border-slate-200 dark:border-white/5 text-slate-400"
+                        )}>
+                            <span className="flex items-center gap-1.5">
+                                <span className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    globalConfig.posterCompressionEnabled ? "bg-emerald-500" : "bg-slate-400"
+                                )} />
+                                {globalConfig.posterCompressionEnabled
+                                    ? (isChinese ? '压缩已启用' : 'Compression ON')
+                                    : (isChinese ? '压缩已关闭' : 'Compression OFF')
+                                }
+                            </span>
+                            <span className="font-mono opacity-70">
+                                {globalConfig.posterCompressionEnabled
+                                    ? `JPG · Q${Math.round((globalConfig.posterCompressionQuality ?? 0.85) * 100)}`
+                                    : 'PNG · Lossless'
+                                }
+                            </span>
+                        </div>
                         <div className="grid grid-cols-2 gap-3">
                             <Button variant="ghost" className="h-12 rounded-xl text-slate-400 font-bold hover:text-slate-600 dark:hover:text-slate-200" onClick={handleRestoreDefault}>
                                 {isChinese ? '恢复默认' : 'Restore Default'}

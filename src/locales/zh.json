@@ -64,6 +64,19 @@
             "customer_change": "客户改主意",
             "shipping_delay": "发货延迟",
             "other": "其他"
+        },
+        "exchange": "换货",
+        "exchanged": "已换货",
+        "exchangeReason": "换货原因",
+        "exchangeSize": "换货后尺码",
+        "exchangeCost": "换货成本",
+        "returnCost": "退货成本",
+        "exchangeReasons": {
+            "size_issue": "尺码不合",
+            "quality_issue": "质量问题",
+            "customer_change": "客户改主意",
+            "shipping_delay": "发货延迟",
+            "other": "其他"
         }
     },
     "newOrder": {
@@ -155,6 +168,9 @@
         "imageCompression": "自动压缩图片",
         "imageCompressionDesc": "上传图片时自动进行压缩以节省空间。",
         "compressionQuality": "压缩质量",
+        "posterCompression": "下载海报时自动压缩",
+        "posterCompressionDesc": "下载订单海报时自动进行压缩，以减小生成的文件体积。",
+        "posterCompressionQuality": "海报压缩质量",
         "maxImageWidth": "最大宽度 (像素)",
         "excludeRefunded": "导出时不包含已退款商品",
         "settingsManagement": "设置管理",
@@ -209,6 +225,10 @@
         "revenueTrends": "月度营收分析",
         "marketingAnalysis": "当日营销分析",
         "yearlyMarketingAnalysis": "年度营销分析",
-        "monthlyMarketingAnalysis": "月度营销分析"
+        "monthlyMarketingAnalysis": "月度营销分析",
+        "aftersalesExpenseAnalysis": "退换货支出分析",
+        "returnExpense": "退货支出",
+        "exchangeExpense": "换货支出",
+        "totalAftersalesExpense": "售后总支出"
     }
 }

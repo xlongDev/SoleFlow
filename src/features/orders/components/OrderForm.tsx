@@ -6,13 +6,13 @@ import { SIZE_MAPPING, COURIER_OPTIONS, CLOTHING_SIZE_MAPPING, PANTS_SIZE_MAPPIN
 import type { OrderItem, ItemCategory, Order } from '@/types/order'
 import { Button, GlassCard } from '@/components/ui/LayoutPrimitives'
 import { Input, Label, Select } from '@/components/ui/FormPrimitives'
-import { Upload, ArrowRight, ShoppingBag, Plus, Trash2, User as UserIcon, MapPin, Phone, Sparkles, TrendingUp, Mic, Loader2, CheckCircle2 } from 'lucide-react'
+import { Upload, ArrowRight, ShoppingBag, Plus, Trash2, User as UserIcon, MapPin, Phone, Sparkles, TrendingUp, Mic, Loader2, CheckCircle2, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useConfigStore } from '@/store/useConfigStore'
 import { cn } from '@/lib/utils'
 import { compressImage, fileToBase64 } from '@/lib/imageCompression'
-import { RotateCcw, ChevronDown, ChevronUp, Copy as CopyIcon } from 'lucide-react'
+import { RotateCcw, ChevronDown, ChevronUp, Copy as CopyIcon, Truck } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Modal } from '@/components/ui/Modal'
 import { computeSmartRecognize, type SmartRecognizePreview } from '@/features/orders/utils/smartRecognize'
@@ -63,6 +63,7 @@ export function OrderForm({ orderId }: OrderFormProps) {
     const [isDragging, setIsDragging] = useState<number | null>(null)
     const [recognizePreview, setRecognizePreview] = useState<SmartRecognizePreview | null>(null)
     const [showAftersales, setShowAftersales] = useState(false)
+    const [compressionProgress, setCompressionProgress] = useState<{ [key: number]: number }>({})
     const { supplierAftercare } = useConfigStore()
 
     useEffect(() => {
@@ -94,20 +95,52 @@ export function OrderForm({ orderId }: OrderFormProps) {
     const processFile = async (index: number, file: File) => {
         if (file && file.type.startsWith('image/')) {
             try {
+                const originalSize = file.size
                 let fileToProcess = file;
+                
+                // Reset and show progress for this index
+                setCompressionProgress(prev => ({ ...prev, [index]: 0 }))
+                
                 if (imageCompressionEnabled) {
                     fileToProcess = await compressImage(file, {
                         maxSizeMB: 0.2,
                         maxWidthOrHeight: 800,
                         useWebWorker: true,
-                        initialQuality: imageCompressionQuality
+                        initialQuality: imageCompressionQuality,
+                        onProgress: (progress) => {
+                            setCompressionProgress(prev => ({ ...prev, [index]: progress }))
+                        }
                     }) as File;
                 }
+                
+                const compressedSize = fileToProcess.size
                 const base64 = await fileToBase64(fileToProcess);
-                handleItemChange(index, 'image', base64);
+                const newItems = [...items]
+                newItems[index] = { 
+                    ...newItems[index], 
+                    image: base64,
+                    originalSize,
+                    compressedSize
+                }
+                setItems(newItems)
+                
+                // Clear progress after completion
+                setTimeout(() => {
+                    setCompressionProgress(prev => {
+                        const next = { ...prev }
+                        delete next[index]
+                        return next
+                    })
+                }, 500)
             } catch (error) {
                 console.error('Error processing image:', error);
                 toast.error(isChinese ? '图片处理失败' : 'Image processing failed');
+                // Clear progress on error
+                setCompressionProgress(prev => {
+                    const next = { ...prev }
+                    delete next[index]
+                    return next
+                })
             }
         } else {
             toast.error(isChinese ? '请上传图片文件' : 'Please upload an image file')
@@ -125,14 +158,26 @@ export function OrderForm({ orderId }: OrderFormProps) {
             for (let i = 0; i < fileArray.length; i++) {
                 const file = fileArray[i]
                 let fileToProcess = file
+                
+                // Track progress for each file being added (use index starting from items.length)
+                const progressIndex = i === 0 && !items[0].image && items[0].name === '' 
+                    ? 0 
+                    : items.length + i
+                
+                setCompressionProgress(prev => ({ ...prev, [progressIndex]: 0 }))
+                
                 if (imageCompressionEnabled) {
                     fileToProcess = await compressImage(file, {
                         maxSizeMB: 0.2,
                         maxWidthOrHeight: 800,
                         useWebWorker: true,
-                        initialQuality: imageCompressionQuality
+                        initialQuality: imageCompressionQuality,
+                        onProgress: (progress) => {
+                            setCompressionProgress(prev => ({ ...prev, [progressIndex]: progress }))
+                        }
                     }) as File
                 }
+                
                 const base64 = await fileToBase64(fileToProcess)
                 
                 if (i === 0 && !items[0].image && items[0].name === '') {
@@ -150,12 +195,23 @@ export function OrderForm({ orderId }: OrderFormProps) {
                         category: items[items.length - 1]?.category || 'shoes'
                     })
                 }
+                
+                // Clear progress for this index
+                setTimeout(() => {
+                    setCompressionProgress(prev => {
+                        const next = { ...prev }
+                        delete next[progressIndex]
+                        return next
+                    })
+                }, 500)
             }
             setItems(newItems)
             toast.success(isChinese ? `成功上传 ${fileArray.length} 张图片` : `Successfully uploaded ${fileArray.length} images`, { id: 'image-upload' })
         } catch (error) {
             console.error('Error processing images:', error)
             toast.error(isChinese ? '图片处理失败' : 'Image processing failed', { id: 'image-upload' })
+            // Clear all progress on error
+            setCompressionProgress({})
         }
     }
 
@@ -289,7 +345,16 @@ export function OrderForm({ orderId }: OrderFormProps) {
             price: Number(item?.price || 0),
             costPrice: Number(item?.costPrice || 0),
             quantity: Math.max(1, Number(item?.quantity || 1)),
-            category: item?.category || 'shoes'
+            category: item?.category || 'shoes',
+            isRefunded: !!item?.isRefunded,
+            refundReason: item?.refundReason || '',
+            returnCost: Number(item?.returnCost || 0),
+            isExchanged: !!item?.isExchanged,
+            exchangeReason: item?.exchangeReason || '',
+            exchangeSize: item?.exchangeSize || '',
+            exchangeCost: Number(item?.exchangeCost || 0),
+            aftersalesCourierCompany: item?.aftersalesCourierCompany || '',
+            aftersalesTrackingNumber: String(item?.aftersalesTrackingNumber || '').trim()
         })).filter(item => item.name)
 
         if (normalizedItems.length === 0) {
@@ -509,31 +574,73 @@ export function OrderForm({ orderId }: OrderFormProps) {
                 <div className="space-y-6">
                     {items.map((item, index) => (
                         <GlassCard key={index} className="p-6 relative group border-white/40 dark:border-white/10">
-                            {items.length > 1 && (
-                                <button
-                                    type="button"
-                                    onClick={() => handleRemoveItem(index)}
-                                    className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors z-10"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            )}
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-slate-200/50 dark:border-white/5 relative z-20">
+                                <span className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                    <ShoppingBag size={14} className="text-primary" />
+                                    {isChinese ? `商品款式 #${index + 1}` : `Item Style #${index + 1}`}
+                                </span>
+                                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                                    {/* Refund Button */}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            const nextRefunded = !item.isRefunded
+                                            handleItemChange(index, 'isRefunded', nextRefunded)
+                                            if (nextRefunded) {
+                                                handleItemChange(index, 'isExchanged', false)
+                                            }
+                                        }}
+                                        className={cn(
+                                            "h-9 px-4 rounded-xl flex items-center gap-1.5 shadow-sm border text-xs font-bold transition-all",
+                                            item.isRefunded
+                                                ? "bg-red-500 text-white border-red-400 hover:bg-red-600"
+                                                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-red-300 hover:text-red-500"
+                                        )}
+                                        title={item.isRefunded ? t('orders.refunded') : t('orders.refund')}
+                                    >
+                                        {item.isRefunded ? <CheckCircle2 size={14} /> : <RotateCcw size={14} />}
+                                        <span>{item.isRefunded ? t('orders.refunded') : t('orders.refund')}</span>
+                                    </button>
 
-                            <div className="absolute -top-3 right-8 z-10">
-                                <button
-                                    type="button"
-                                    onClick={() => handleItemChange(index, 'isRefunded', !item.isRefunded)}
-                                    className={cn(
-                                        "h-8 px-3 rounded-full flex items-center gap-1.5 shadow-lg border text-xs font-bold transition-all",
-                                        item.isRefunded
-                                            ? "bg-red-500 text-white border-red-400 hover:bg-red-600"
-                                            : "bg-white dark:bg-slate-900 text-slate-600 border-slate-200 dark:border-slate-700 hover:border-red-300 hover:text-red-500"
+                                    {/* Exchange Button */}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            const nextExchanged = !item.isExchanged
+                                            handleItemChange(index, 'isExchanged', nextExchanged)
+                                            if (nextExchanged) {
+                                                handleItemChange(index, 'isRefunded', false)
+                                            }
+                                        }}
+                                        className={cn(
+                                            "h-9 px-4 rounded-xl flex items-center gap-1.5 shadow-sm border text-xs font-bold transition-all",
+                                            item.isExchanged
+                                                ? "bg-blue-500 text-white border-blue-400 hover:bg-blue-600"
+                                                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-blue-300 hover:text-blue-500"
+                                        )}
+                                        title={item.isExchanged ? (isChinese ? '已换货' : 'Exchanged') : (isChinese ? '申请换货' : 'Exchange')}
+                                    >
+                                        {item.isExchanged ? <CheckCircle2 size={14} /> : <RefreshCw size={14} />}
+                                        <span>{item.isExchanged ? (isChinese ? '已换货' : 'Exchanged') : (isChinese ? '换货' : 'Exchange')}</span>
+                                    </button>
+
+                                    {/* Delete Button */}
+                                    {items.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleRemoveItem(index)
+                                            }}
+                                            className="h-9 w-9 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                                            title={isChinese ? '删除款式' : 'Delete style'}
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
                                     )}
-                                    title={item.isRefunded ? t('orders.refunded') : t('orders.refund')}
-                                >
-                                    {item.isRefunded ? <CheckCircle2 size={14} /> : <RotateCcw size={14} />}
-                                    <span>{item.isRefunded ? t('orders.refunded') : t('orders.refund')}</span>
-                                </button>
+                                </div>
                             </div>
 
                             <div className={cn("grid grid-cols-1 lg:grid-cols-12 gap-8 transition-opacity", item.isRefunded && "opacity-50 grayscale-[0.5]")}>
@@ -604,6 +711,45 @@ export function OrderForm({ orderId }: OrderFormProps) {
                                             onChange={e => handleImageUpload(index, e)}
                                         />
                                     </div>
+
+                                    {/* Compression progress */}
+                                    {compressionProgress[index] !== undefined && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                                                <span>{isChinese ? '正在压缩...' : 'Compressing...'}</span>
+                                                <span>{compressionProgress[index]}%</span>
+                                            </div>
+                                            <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-primary transition-all duration-200"
+                                                    style={{ width: `${compressionProgress[index]}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Image size info badge */}
+                                    {item.image && imageCompressionEnabled && item.originalSize && item.compressedSize && (
+                                        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-500/5 border border-emerald-500/15 text-[10px] font-bold">
+                                            <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                                <span className="text-slate-400 line-through">
+                                                    {(item.originalSize / 1024).toFixed(1)} KB
+                                                </span>
+                                                <span className="text-slate-300 dark:text-slate-600 mx-0.5">→</span>
+                                                <span className="text-emerald-600 dark:text-emerald-400 font-black">
+                                                    {(item.compressedSize / 1024).toFixed(1)} KB
+                                                </span>
+                                            </span>
+                                            <span className="text-emerald-600 dark:text-emerald-400 font-black">
+                                                -{Math.round((1 - item.compressedSize / item.originalSize) * 100)}%
+                                            </span>
+                                        </div>
+                                    )}
+                                    {item.image && !imageCompressionEnabled && item.originalSize && (
+                                        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-white/5 text-[10px] font-bold text-slate-400">
+                                            <span>{isChinese ? '原始大小' : 'Original size'}</span>
+                                            <span className="font-mono">{(item.originalSize / 1024).toFixed(1)} KB</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Item Details */}
@@ -700,25 +846,165 @@ export function OrderForm({ orderId }: OrderFormProps) {
                                         <motion.div 
                                             initial={{ opacity: 0, height: 0 }}
                                             animate={{ opacity: 1, height: 'auto' }}
-                                            className="sm:col-span-2 space-y-2 pt-2 border-t border-red-500/20"
+                                            className="sm:col-span-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-red-500/20"
                                         >
-                                            <Label className="text-red-500 flex items-center gap-2">
-                                                <RotateCcw size={14} />
-                                                {t('orders.refundReason')}
-                                            </Label>
-                                            <Select 
-                                                value={item.refundReason || ''} 
-                                                onChange={e => handleItemChange(index, 'refundReason', e.target.value)}
-                                                className="border-red-500/30 focus:ring-red-500/20"
-                                            >
-                                                <option value="">{isChinese ? '-- 请选择退款原因 --' : '-- Select Reason --'}</option>
-                                                <option value="size_issue">{t('orders.refundReasons.size_issue')}</option>
-                                                <option value="quality_issue">{t('orders.refundReasons.quality_issue')}</option>
-                                                <option value="out_of_stock">{t('orders.refundReasons.out_of_stock')}</option>
-                                                <option value="customer_change">{t('orders.refundReasons.customer_change')}</option>
-                                                <option value="shipping_delay">{t('orders.refundReasons.shipping_delay')}</option>
-                                                <option value="other">{t('orders.refundReasons.other')}</option>
-                                            </Select>
+                                            <div className="space-y-2">
+                                                <Label className="text-red-500 flex items-center gap-2">
+                                                    <RotateCcw size={14} />
+                                                    {t('orders.refundReason')}
+                                                </Label>
+                                                <Select 
+                                                    value={item.refundReason || ''} 
+                                                    onChange={e => handleItemChange(index, 'refundReason', e.target.value)}
+                                                    className="border-red-500/30 focus:ring-red-500/20"
+                                                >
+                                                    <option value="">{isChinese ? '-- 请选择退款原因 --' : '-- Select Reason --'}</option>
+                                                    <option value="size_issue">{t('orders.refundReasons.size_issue')}</option>
+                                                    <option value="quality_issue">{t('orders.refundReasons.quality_issue')}</option>
+                                                    <option value="out_of_stock">{t('orders.refundReasons.out_of_stock')}</option>
+                                                    <option value="customer_change">{t('orders.refundReasons.customer_change')}</option>
+                                                    <option value="shipping_delay">{t('orders.refundReasons.shipping_delay')}</option>
+                                                    <option value="other">{t('orders.refundReasons.other')}</option>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-red-500 flex items-center gap-2">
+                                                    <RotateCcw size={14} />
+                                                    {isChinese ? '退货成本 (¥)' : 'Return Cost (¥)'}
+                                                </Label>
+                                                <Input 
+                                                    type="number"
+                                                    value={item.returnCost || ''} 
+                                                    onChange={e => handleItemChange(index, 'returnCost', e.target.value)}
+                                                    className="border-red-500/30 focus:ring-red-500/20"
+                                                    placeholder={isChinese ? '退货运费/损耗支出' : 'Shipping/damage costs'}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-red-500 flex items-center gap-2">
+                                                    <Truck size={14} />
+                                                    {isChinese ? '退回快递公司' : 'Return Courier'}
+                                                </Label>
+                                                <Select
+                                                    value={item.aftersalesCourierCompany || ''}
+                                                    onChange={e => handleItemChange(index, 'aftersalesCourierCompany', e.target.value)}
+                                                    className="border-red-500/30 focus:ring-red-500/20"
+                                                >
+                                                    <option value="">{isChinese ? '-- 选择快递公司 --' : '-- Select Courier --'}</option>
+                                                    {COURIER_OPTIONS.map(opt => (
+                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                    ))}
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-red-500 flex items-center gap-2">
+                                                    <Truck size={14} />
+                                                    {isChinese ? '退回快递单号' : 'Return Tracking #'}
+                                                </Label>
+                                                <Input
+                                                    type="text"
+                                                    value={item.aftersalesTrackingNumber || ''}
+                                                    onChange={e => handleItemChange(index, 'aftersalesTrackingNumber', e.target.value)}
+                                                    className="border-red-500/30 focus:ring-red-500/20"
+                                                    placeholder={isChinese ? '快递单号' : 'Tracking number'}
+                                                />
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    {item.isExchanged && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            className="sm:col-span-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 pt-4 border-t border-blue-500/20"
+                                        >
+                                            <div className="space-y-2">
+                                                <Label className="text-blue-500 flex items-center gap-2">
+                                                    <RefreshCw size={14} />
+                                                    {isChinese ? '换货原因' : 'Exchange Reason'}
+                                                </Label>
+                                                <Select 
+                                                    value={item.exchangeReason || ''} 
+                                                    onChange={e => handleItemChange(index, 'exchangeReason', e.target.value)}
+                                                    className="border-blue-500/30 focus:ring-blue-500/20"
+                                                >
+                                                    <option value="">{isChinese ? '-- 请选择换货原因 --' : '-- Select Reason --'}</option>
+                                                    <option value="size_issue">{isChinese ? '尺码不合' : 'Size Issue'}</option>
+                                                    <option value="quality_issue">{isChinese ? '质量问题' : 'Quality Issue'}</option>
+                                                    <option value="customer_change">{isChinese ? '客户改主意' : 'Customer Changed Mind'}</option>
+                                                    <option value="shipping_delay">{isChinese ? '发货延迟' : 'Shipping Delay'}</option>
+                                                    <option value="other">{isChinese ? '其他' : 'Other'}</option>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-blue-500 flex items-center gap-2">
+                                                    <RefreshCw size={14} />
+                                                    {isChinese ? '换货后尺码' : 'Exchanged Size'}
+                                                </Label>
+                                                <Select 
+                                                    value={item.exchangeSize || item.size} 
+                                                    onChange={e => handleItemChange(index, 'exchangeSize', e.target.value)}
+                                                    className="border-blue-500/30 focus:ring-blue-500/20"
+                                                >
+                                                    {item.category === 'clothes' ? (
+                                                        CLOTHING_SIZE_MAPPING.map(s => (
+                                                            <option key={s} value={s}>{s}</option>
+                                                        ))
+                                                    ) : item.category === 'pants' ? (
+                                                        PANTS_SIZE_MAPPING.map(s => (
+                                                            <option key={s} value={s}>{s}</option>
+                                                        ))
+                                                    ) : (
+                                                        SIZE_MAPPING.map(s => (
+                                                            <option key={s.eur} value={s.eur}>
+                                                                {isChinese ? `${s.eur}码` : `${s.eur} (US ${s.us})`}
+                                                            </option>
+                                                        ))
+                                                    )}
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-blue-500 flex items-center gap-2">
+                                                    <RefreshCw size={14} />
+                                                    {isChinese ? '换货成本 (¥)' : 'Exchange Cost (¥)'}
+                                                </Label>
+                                                <Input 
+                                                    type="number"
+                                                    value={item.exchangeCost || ''} 
+                                                    onChange={e => handleItemChange(index, 'exchangeCost', e.target.value)}
+                                                    className="border-blue-500/30 focus:ring-blue-500/20"
+                                                    placeholder={isChinese ? '来回运费等支出' : 'Shipping costs'}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-blue-500 flex items-center gap-2">
+                                                    <Truck size={14} />
+                                                    {isChinese ? '换货快递公司' : 'Exchange Courier'}
+                                                </Label>
+                                                <Select
+                                                    value={item.aftersalesCourierCompany || ''}
+                                                    onChange={e => handleItemChange(index, 'aftersalesCourierCompany', e.target.value)}
+                                                    className="border-blue-500/30 focus:ring-blue-500/20"
+                                                >
+                                                    <option value="">{isChinese ? '-- 选择快递公司 --' : '-- Select Courier --'}</option>
+                                                    {COURIER_OPTIONS.map(opt => (
+                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                    ))}
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-blue-500 flex items-center gap-2">
+                                                    <Truck size={14} />
+                                                    {isChinese ? '换货快递单号' : 'Exchange Tracking #'}
+                                                </Label>
+                                                <Input
+                                                    type="text"
+                                                    value={item.aftersalesTrackingNumber || ''}
+                                                    onChange={e => handleItemChange(index, 'aftersalesTrackingNumber', e.target.value)}
+                                                    className="border-blue-500/30 focus:ring-blue-500/20"
+                                                    placeholder={isChinese ? '快递单号' : 'Tracking number'}
+                                                />
+                                            </div>
                                         </motion.div>
                                     )}
                                 </div>
@@ -834,21 +1120,104 @@ export function OrderForm({ orderId }: OrderFormProps) {
                 {recognizePreview && (
                     <div className="space-y-6">
                         <p className="text-sm text-slate-500">
-                            {isChinese ? '请核对以下信息，确认后将写入当前表单。' : 'Review the parsed data. Confirm to apply it to the form.'}
+                            {isChinese ? '请核对并编辑以下信息，确认后将写入当前表单。' : 'Review and edit the parsed data. Confirm to apply it to the form.'}
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-4 space-y-2">
+                            <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-4 space-y-3">
                                 <p className="text-xs font-bold text-slate-400 uppercase">{isChinese ? '收件人' : 'Recipient'}</p>
-                                <p><span className="text-slate-500">{isChinese ? '姓名' : 'Name'}: </span>{recognizePreview.recipient.name || '—'}</p>
-                                <p><span className="text-slate-500">{isChinese ? '电话' : 'Phone'}: </span>{recognizePreview.recipient.phone || '—'}</p>
-                                <p className="whitespace-pre-wrap"><span className="text-slate-500">{isChinese ? '地址' : 'Address'}: </span>{recognizePreview.recipient.address || '—'}</p>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-slate-500">{isChinese ? '姓名' : 'Name'}</Label>
+                                    <Input
+                                        value={recognizePreview.recipient.name}
+                                        onChange={(e) => setRecognizePreview({
+                                            ...recognizePreview,
+                                            recipient: { ...recognizePreview.recipient, name: e.target.value }
+                                        })}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-slate-500">{isChinese ? '电话' : 'Phone'}</Label>
+                                    <Input
+                                        value={recognizePreview.recipient.phone}
+                                        onChange={(e) => setRecognizePreview({
+                                            ...recognizePreview,
+                                            recipient: { ...recognizePreview.recipient, phone: e.target.value }
+                                        })}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-slate-500">{isChinese ? '地址' : 'Address'}</Label>
+                                    <textarea
+                                        value={recognizePreview.recipient.address}
+                                        onChange={(e) => setRecognizePreview({
+                                            ...recognizePreview,
+                                            recipient: { ...recognizePreview.recipient, address: e.target.value }
+                                        })}
+                                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-all resize-none"
+                                        rows={3}
+                                    />
+                                </div>
                             </div>
-                            <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-4 space-y-2">
+                            <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-4 space-y-3">
                                 <p className="text-xs font-bold text-slate-400 uppercase">{isChinese ? '物流与供应商' : 'Shipping & supplier'}</p>
-                                <p><span className="text-slate-500">{isChinese ? '快递' : 'Courier'}: </span>{recognizePreview.shipping.company}</p>
-                                <p><span className="text-slate-500">{isChinese ? '单号' : 'Tracking'}: </span>{recognizePreview.shipping.trackingNumber || '—'}</p>
-                                <p><span className="text-slate-500">{isChinese ? '状态' : 'Status'}: </span>{recognizePreview.shipping.status}</p>
-                                <p><span className="text-slate-500">{isChinese ? '供应商' : 'Supplier'}: </span>{recognizePreview.supplier}</p>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-slate-500">{isChinese ? '快递' : 'Courier'}</Label>
+                                    <Select
+                                        value={recognizePreview.shipping.company}
+                                        onChange={(e) => setRecognizePreview({
+                                            ...recognizePreview,
+                                            shipping: { ...recognizePreview.shipping, company: e.target.value }
+                                        })}
+                                        className="h-9"
+                                    >
+                                        {COURIER_OPTIONS.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-slate-500">{isChinese ? '单号' : 'Tracking'}</Label>
+                                    <Input
+                                        value={recognizePreview.shipping.trackingNumber}
+                                        onChange={(e) => setRecognizePreview({
+                                            ...recognizePreview,
+                                            shipping: { ...recognizePreview.shipping, trackingNumber: e.target.value }
+                                        })}
+                                        className="h-9"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-slate-500">{isChinese ? '状态' : 'Status'}</Label>
+                                    <Select
+                                        value={recognizePreview.shipping.status}
+                                        onChange={(e) => setRecognizePreview({
+                                            ...recognizePreview,
+                                            shipping: { ...recognizePreview.shipping, status: e.target.value }
+                                        })}
+                                        className="h-9"
+                                    >
+                                        <option value="pending">{t('status.pending')}</option>
+                                        <option value="shipped">{t('status.shipped')}</option>
+                                        <option value="delivered">{t('status.delivered')}</option>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-slate-500">{isChinese ? '供应商' : 'Supplier'}</Label>
+                                    <Select
+                                        value={recognizePreview.supplier}
+                                        onChange={(e) => setRecognizePreview({
+                                            ...recognizePreview,
+                                            supplier: e.target.value
+                                        })}
+                                        className="h-9"
+                                    >
+                                        {suppliers.map(s => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </Select>
+                                </div>
                             </div>
                         </div>
                         <div className="rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden">
@@ -857,13 +1226,96 @@ export function OrderForm({ orderId }: OrderFormProps) {
                             </div>
                             <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-white/10">
                                 {recognizePreview.items.map((it, idx) => (
-                                    <div key={idx} className="px-4 py-3 grid grid-cols-12 gap-2 text-sm">
-                                        <div className="col-span-12 sm:col-span-5 font-medium truncate">{it.name}</div>
-                                        <div className="col-span-4 sm:col-span-2">{isChinese ? `${it.size} 码` : it.size}</div>
-                                        <div className="col-span-4 sm:col-span-2">×{it.quantity}</div>
-                                        <div className="col-span-4 sm:col-span-3 text-primary font-bold">¥{it.price}</div>
+                                    <div key={idx} className="px-4 py-3 space-y-3">
+                                        <div className="grid grid-cols-12 gap-2 items-center">
+                                            <div className="col-span-12 sm:col-span-5 space-y-1">
+                                                <Label className="text-xs text-slate-500">{isChinese ? '商品名称' : 'Name'}</Label>
+                                                <Input
+                                                    value={it.name}
+                                                    onChange={(e) => {
+                                                        const newItems = [...recognizePreview.items];
+                                                        newItems[idx] = { ...it, name: e.target.value };
+                                                        setRecognizePreview({ ...recognizePreview, items: newItems });
+                                                    }}
+                                                    className="h-8"
+                                                />
+                                            </div>
+                                            <div className="col-span-6 sm:col-span-2 space-y-1">
+                                                <Label className="text-xs text-slate-500">{isChinese ? '尺码' : 'Size'}</Label>
+                                                <Input
+                                                    value={it.size}
+                                                    onChange={(e) => {
+                                                        const newItems = [...recognizePreview.items];
+                                                        newItems[idx] = { ...it, size: e.target.value };
+                                                        setRecognizePreview({ ...recognizePreview, items: newItems });
+                                                    }}
+                                                    className="h-8"
+                                                />
+                                            </div>
+                                            <div className="col-span-6 sm:col-span-2 space-y-1">
+                                                <Label className="text-xs text-slate-500">{isChinese ? '数量' : 'Qty'}</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={it.quantity}
+                                                    onChange={(e) => {
+                                                        const newItems = [...recognizePreview.items];
+                                                        newItems[idx] = { ...it, quantity: parseInt(e.target.value) || 1 };
+                                                        setRecognizePreview({ ...recognizePreview, items: newItems });
+                                                    }}
+                                                    className="h-8"
+                                                />
+                                            </div>
+                                            <div className="col-span-12 sm:col-span-3 space-y-1">
+                                                <Label className="text-xs text-slate-500">{isChinese ? '价格' : 'Price'}</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={it.price}
+                                                    onChange={(e) => {
+                                                        const newItems = [...recognizePreview.items];
+                                                        newItems[idx] = { ...it, price: parseFloat(e.target.value) || 0 };
+                                                        setRecognizePreview({ ...recognizePreview, items: newItems });
+                                                    }}
+                                                    className="h-8"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const newItems = recognizePreview.items.filter((_, i) => i !== idx);
+                                                    setRecognizePreview({ ...recognizePreview, items: newItems });
+                                                }}
+                                                className="text-xs text-red-500 hover:text-red-600 font-medium"
+                                            >
+                                                {isChinese ? '删除' : 'Remove'}
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
+                            </div>
+                            <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/30">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => {
+                                        const newItems: OrderItem[] = [...recognizePreview.items, {
+                                            name: '',
+                                            size: '42',
+                                            price: 0,
+                                            costPrice: 0,
+                                            quantity: 1,
+                                            image: '',
+                                            category: 'shoes'
+                                        }];
+                                        setRecognizePreview({ ...recognizePreview, items: newItems });
+                                    }}
+                                    className="w-full justify-center rounded-xl h-9"
+                                >
+                                    <Plus size={16} className="mr-1" />
+                                    {isChinese ? '添加商品' : 'Add item'}
+                                </Button>
                             </div>
                         </div>
                         <div className="flex justify-end gap-3 pt-2">

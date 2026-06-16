@@ -28,6 +28,8 @@ interface ConfigStore {
     supplierAftercare: Record<string, SupplierAftercare>;
     imageCompressionEnabled: boolean;
     imageCompressionQuality: number;
+    posterCompressionEnabled: boolean;
+    posterCompressionQuality: number;
     maxImageWidth: number;
     setLogo: (logo: string | null) => void;
     setPrimaryColor: (color: string) => void;
@@ -41,6 +43,8 @@ interface ConfigStore {
     updateSupplierAftercare: (supplierName: string, patch: Partial<SupplierAftercare>) => void;
     setImageCompressionEnabled: (enabled: boolean) => void;
     setImageCompressionQuality: (quality: number) => void;
+    setPosterCompressionEnabled: (enabled: boolean) => void;
+    setPosterCompressionQuality: (quality: number) => void;
     setMaxImageWidth: (width: number) => void;
     exportSettings: () => string;
     importSettings: (jsonString: string) => boolean;
@@ -64,6 +68,8 @@ export const useConfigStore = create<ConfigStore>()(
             },
             imageCompressionEnabled: true,
             imageCompressionQuality: 0.8,
+            posterCompressionEnabled: true,
+            posterCompressionQuality: 0.85,
             maxImageWidth: 1280,
 
             setLogo: (logo) => set({ logo }),
@@ -108,6 +114,8 @@ export const useConfigStore = create<ConfigStore>()(
             })),
             setImageCompressionEnabled: (enabled) => set({ imageCompressionEnabled: enabled }),
             setImageCompressionQuality: (quality) => set({ imageCompressionQuality: quality }),
+            setPosterCompressionEnabled: (enabled) => set({ posterCompressionEnabled: enabled }),
+            setPosterCompressionQuality: (quality) => set({ posterCompressionQuality: quality }),
             setMaxImageWidth: (width) => set({ maxImageWidth: width }),
 
             exportSettings: () => {
@@ -125,6 +133,8 @@ export const useConfigStore = create<ConfigStore>()(
                     supplierAftercare: state.supplierAftercare,
                     imageCompressionEnabled: state.imageCompressionEnabled,
                     imageCompressionQuality: state.imageCompressionQuality,
+                    posterCompressionEnabled: state.posterCompressionEnabled,
+                    posterCompressionQuality: state.posterCompressionQuality,
                     maxImageWidth: state.maxImageWidth,
                     exportDate: new Date().toISOString()
                 };
@@ -153,6 +163,8 @@ export const useConfigStore = create<ConfigStore>()(
                     }
                     if (settings.imageCompressionEnabled !== undefined) newState.imageCompressionEnabled = settings.imageCompressionEnabled;
                     if (settings.imageCompressionQuality !== undefined) newState.imageCompressionQuality = settings.imageCompressionQuality;
+                    if (settings.posterCompressionEnabled !== undefined) newState.posterCompressionEnabled = settings.posterCompressionEnabled;
+                    if (settings.posterCompressionQuality !== undefined) newState.posterCompressionQuality = settings.posterCompressionQuality;
                     if (settings.maxImageWidth !== undefined) newState.maxImageWidth = settings.maxImageWidth;
 
                     if (settings.lightBgColor) {
@@ -198,6 +210,8 @@ export const useConfigStore = create<ConfigStore>()(
                     supplierAftercare: { 'Default Supplier': emptySupplierAftercare() },
                     imageCompressionEnabled: true,
                     imageCompressionQuality: 0.8,
+                    posterCompressionEnabled: true,
+                    posterCompressionQuality: 0.85,
                     maxImageWidth: 1280,
                 };
                 set(defaults);

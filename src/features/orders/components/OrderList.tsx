@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react'
 import { useOrderStore } from '@/store/useOrderStore'
 import { GlassCard, Button } from '@/components/ui/LayoutPrimitives'
 import { Input, Select } from '@/components/ui/FormPrimitives'
-import { Search, Package, ExternalLink, User, Image as ImageIcon, Edit2, LayoutGrid, List, Download, Upload as UploadIcon, Trash2, TrendingUp, Phone, Copy, RotateCcw } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Search, Package, ExternalLink, User, Image as ImageIcon, Edit2, LayoutGrid, List, Download, Upload as UploadIcon, Trash2, TrendingUp, Phone, Copy, RotateCcw, RefreshCw } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { COURIER_OPTIONS, SIZE_MAPPING } from '@/types/order'
 import type { Order } from '@/types/order'
 import { format } from 'date-fns'
@@ -46,12 +46,23 @@ const OrderImageStack = ({ items }: { items: any[] }) => {
                         transition={{ duration: 0.2 }}
                         src={items[currentIndex].image}
                         alt={items[currentIndex].name}
-                        className={cn("w-full h-full object-contain drop-shadow-xl", items[currentIndex].isRefunded && "grayscale opacity-60")}
+                        className={cn(
+                            "w-full h-full object-contain drop-shadow-xl", 
+                            items[currentIndex].isRefunded && "grayscale opacity-60",
+                            items[currentIndex].isExchanged && "opacity-85"
+                        )}
                     />
                     {items[currentIndex].isRefunded && (
                         <div className="absolute inset-0 flex items-center justify-center">
                             <span className="bg-red-500/80 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider transform -rotate-12 shadow-lg">
                                 Refunded
+                            </span>
+                        </div>
+                    )}
+                    {items[currentIndex].isExchanged && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="bg-blue-500/80 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider transform -rotate-12 shadow-lg">
+                                Exchanged
                             </span>
                         </div>
                     )}
@@ -82,6 +93,7 @@ export function OrderList() {
     const isChinese = i18n.language.startsWith('zh')
     const locale = isChinese ? zhCN : enUS
     const navigate = useNavigate()
+    const [searchParams, setSearchParams] = useSearchParams()
     const { orders, deleteOrder, deleteOrders, categoryFilter, setCategoryFilter } = useOrderStore()
     const [search, setSearch] = useState('')
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
@@ -104,10 +116,26 @@ export function OrderList() {
     // Refs removed as they are now in DataManagementModal
     const [isDataModalOpen, setIsDataModalOpen] = useState(false)
     const [dataModalMode, setDataModalMode] = useState<'all' | 'selected'>('all')
-    const [showRefundedOnly, setShowRefundedOnly] = useState(() => {
-        const params = new URLSearchParams(window.location.search)
-        return params.get('filter') === 'refunded'
-    })
+
+    // Derive filter state from URL search params (reactive to navigation)
+    const showRefundedOnly = searchParams.get('filter') === 'refunded'
+    const showExchangedOnly = searchParams.get('filter') === 'exchanged'
+
+    const setShowRefundedOnly = (val: boolean) => {
+        if (val) {
+            setSearchParams({ filter: 'refunded' })
+        } else {
+            setSearchParams({})
+        }
+    }
+
+    const setShowExchangedOnly = (val: boolean) => {
+        if (val) {
+            setSearchParams({ filter: 'exchanged' })
+        } else {
+            setSearchParams({})
+        }
+    }
 
     const handleCopyOrderInfo = (order: Order) => {
         const itemsStr = order.items.map(item => `${item.name} ${item.size}码`).join('\n')
@@ -140,6 +168,12 @@ export function OrderList() {
             )
         }
 
+        if (showExchangedOnly) {
+            result = result.filter(order =>
+                order.items.some(item => item.isExchanged)
+            )
+        }
+
         switch (sortBy) {
             case 'newest':
                 result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -159,7 +193,7 @@ export function OrderList() {
         }
 
         return result
-    }, [orders, search, sortBy, categoryFilter, showRefundedOnly])
+    }, [orders, search, sortBy, categoryFilter, showRefundedOnly, showExchangedOnly])
 
     const getCourierLabel = (val: string) => COURIER_OPTIONS.find(c => c.value === val)?.label || val
 
@@ -168,6 +202,16 @@ export function OrderList() {
         if (courier && courier.urlQuery && order.shipping.trackingNumber) {
             const url = courier.urlQuery + order.shipping.trackingNumber;
             // Ensure URL is absolute to prevent GH Pages 404
+            return url.startsWith('http') ? url : `https://${url}`;
+        }
+        return undefined;
+    }
+
+    const getAftersalesTrackingLink = (company?: string, tracking?: string) => {
+        if (!company || !tracking) return undefined;
+        const courier = COURIER_OPTIONS.find(c => c.value === company);
+        if (courier && courier.urlQuery) {
+            const url = courier.urlQuery + tracking;
             return url.startsWith('http') ? url : `https://${url}`;
         }
         return undefined;
@@ -284,6 +328,19 @@ export function OrderList() {
                             <RotateCcw size={16} className={cn(showRefundedOnly && "animate-spin-slow")} />
                             {isChinese ? '退款订单' : 'Refunds'}
                         </button>
+
+                        <button
+                            onClick={() => setShowExchangedOnly(!showExchangedOnly)}
+                            className={cn(
+                                "h-11 px-4 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border shrink-0",
+                                showExchangedOnly 
+                                    ? "bg-blue-500/10 border-blue-500/20 text-blue-500" 
+                                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                            )}
+                        >
+                            <RefreshCw size={16} className={cn(showExchangedOnly && "animate-spin-slow")} />
+                            {isChinese ? '换货订单' : 'Exchanges'}
+                        </button>
                     </div>
                 </div>
 
@@ -363,10 +420,19 @@ export function OrderList() {
                                     <div className="aspect-[16/10] bg-slate-100 dark:bg-slate-800/50 relative overflow-hidden flex items-center justify-center p-4">
                                         <OrderImageStack items={order.items} />
                                         <div className="absolute top-3 right-3 flex flex-col gap-2 items-end pointer-events-none">
-                                            <span className="px-3 py-1 bg-black/60 backdrop-blur-md text-white text-xs rounded-full font-bold shadow-lg border border-white/20">
+                                            <span className={cn(
+                                                "px-3 py-1 backdrop-blur-md text-white text-xs rounded-full font-bold shadow-lg border",
+                                                order.items[0]?.isExchanged 
+                                                    ? "bg-blue-500/80 border-blue-400/20" 
+                                                    : "bg-black/60 border-white/20"
+                                            )}>
                                                 {(() => {
-                                                    const sizeInfo = SIZE_MAPPING.find(s => s.eur === order.items[0]?.size);
-                                                    return isChinese ? `${order.items[0]?.size} 码` : `US ${sizeInfo?.us || order.items[0]?.size}`;
+                                                    const effectiveSize = order.items[0]?.isExchanged 
+                                                        ? (order.items[0]?.exchangeSize || order.items[0]?.size) 
+                                                        : order.items[0]?.size;
+                                                    const sizeInfo = SIZE_MAPPING.find(s => s.eur === effectiveSize);
+                                                    const sizeStr = isChinese ? `${effectiveSize} 码` : `US ${sizeInfo?.us || effectiveSize}`;
+                                                    return order.items[0]?.isExchanged ? `${sizeStr} (${isChinese ? '已换' : 'Ex'})` : sizeStr;
                                                 })()}
                                             </span>
                                             {order.items.some(item => item.isRefunded) && (
@@ -375,6 +441,14 @@ export function OrderList() {
                                                     order.items.every(item => item.isRefunded) ? "bg-red-500/80" : "bg-orange-500/80"
                                                 )}>
                                                     {order.items.every(item => item.isRefunded) ? (isChinese ? '全部退款' : 'Refunded') : (isChinese ? '部分退款' : 'Partial Refund')}
+                                                </span>
+                                            )}
+                                            {order.items.some(item => item.isExchanged) && (
+                                                <span className={cn(
+                                                    "px-3 py-1 backdrop-blur-md text-white text-[10px] rounded-full font-bold shadow-lg border border-blue-400/20",
+                                                    order.items.every(item => item.isExchanged) ? "bg-blue-500/80" : "bg-cyan-500/80"
+                                                )}>
+                                                    {order.items.every(item => item.isExchanged) ? (isChinese ? '全部换货' : 'Exchanged') : (isChinese ? '部分换货' : 'Partial Exchange')}
                                                 </span>
                                             )}
                                             {order.items.length > 1 && (
@@ -425,6 +499,42 @@ export function OrderList() {
                                                             <ExternalLink size={10} />
                                                         </a>
                                                     ) : <span className="opacity-50">No Tracking</span>}
+                                                    {order.items.map((item, idx) => {
+                                                         if (item.aftersalesTrackingNumber) {
+                                                             const aftersalesLink = getAftersalesTrackingLink(item.aftersalesCourierCompany, item.aftersalesTrackingNumber);
+                                                             const badgeText = item.isRefunded 
+                                                                 ? (isChinese ? '退货' : 'Ret') 
+                                                                 : (isChinese ? '换货' : 'Ex');
+                                                             const badgeColor = item.isRefunded 
+                                                                 ? 'text-red-500 bg-red-500/10 border-red-500/20' 
+                                                                 : 'text-blue-500 bg-blue-500/10 border-blue-500/20';
+                                                             return (
+                                                                 <div key={idx} className="mt-1.5 flex items-center gap-1 flex-wrap text-[10px]">
+                                                                     <span className={cn("px-1 py-0.5 rounded border text-[9px] font-black scale-90 origin-left uppercase shrink-0", badgeColor)}>
+                                                                         {badgeText}
+                                                                     </span>
+                                                                     <span className="opacity-60 shrink-0 font-medium truncate max-w-[70px]">
+                                                                         {getCourierLabel(item.aftersalesCourierCompany || '')}:
+                                                                     </span>
+                                                                     {aftersalesLink ? (
+                                                                         <a
+                                                                             href={aftersalesLink}
+                                                                             target="_blank"
+                                                                             rel="noreferrer"
+                                                                             className="font-mono font-bold text-slate-600 dark:text-slate-400 hover:text-primary hover:underline flex items-center gap-0.5"
+                                                                             onClick={e => e.stopPropagation()}
+                                                                         >
+                                                                             {item.aftersalesTrackingNumber}
+                                                                             <ExternalLink size={8} />
+                                                                         </a>
+                                                                     ) : (
+                                                                         <span className="font-mono text-slate-500">{item.aftersalesTrackingNumber}</span>
+                                                                     )}
+                                                                 </div>
+                                                             );
+                                                         }
+                                                         return null;
+                                                     })}
                                                 </div>
                                                 <div className="text-right shrink-0 font-medium">
                                                     {format(new Date(order.createdAt), isChinese ? 'MM-dd HH:mm' : 'MMM d, HH:mm', { locale })}
@@ -496,8 +606,12 @@ export function OrderList() {
                                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t('orders.size')}</p>
                                             <p className="text-sm font-medium mt-1">
                                                 {(() => {
-                                                    const sizeInfo = SIZE_MAPPING.find(s => s.eur === order.items[0]?.size);
-                                                    return isChinese ? `${order.items[0]?.size} 码` : `US ${sizeInfo?.us || order.items[0]?.size}`;
+                                                    const effectiveSize = order.items[0]?.isExchanged 
+                                                        ? (order.items[0]?.exchangeSize || order.items[0]?.size) 
+                                                        : order.items[0]?.size;
+                                                    const sizeInfo = SIZE_MAPPING.find(s => s.eur === effectiveSize);
+                                                    const sizeStr = isChinese ? `${effectiveSize} 码` : `US ${sizeInfo?.us || effectiveSize}`;
+                                                    return order.items[0]?.isExchanged ? `${sizeStr} (${isChinese ? '已换' : 'Ex'})` : sizeStr;
                                                 })()}
                                                 {order.items.length > 1 && <span className="ml-2 text-xs text-primary">+{order.items.length - 1} items</span>}
                                             </p>
@@ -515,12 +629,47 @@ export function OrderList() {
                                                     <ExternalLink size={12} />
                                                 </a>
                                             ) : <p className="text-sm opacity-30 mt-1">---</p>}
+                                            {order.items.map((item, idx) => {
+                                                if (item.aftersalesTrackingNumber) {
+                                                    const aftersalesLink = getAftersalesTrackingLink(item.aftersalesCourierCompany, item.aftersalesTrackingNumber);
+                                                    const badgeText = item.isRefunded 
+                                                        ? (isChinese ? '退货' : 'Ret') 
+                                                        : (isChinese ? '换货' : 'Ex');
+                                                    const badgeColor = item.isRefunded 
+                                                        ? 'text-red-500 bg-red-500/10 border-red-500/20' 
+                                                        : 'text-blue-500 bg-blue-500/10 border-blue-500/20';
+                                                    return (
+                                                        <div key={idx} className="mt-1 flex items-center gap-1 text-[10px]" onClick={e => e.stopPropagation()}>
+                                                            <span className={cn("px-1 py-0.2 rounded border text-[9px] font-bold uppercase shrink-0 scale-90 origin-left", badgeColor)}>
+                                                                {badgeText}
+                                                            </span>
+                                                            <span className="opacity-60 shrink-0 font-medium truncate max-w-[70px]">
+                                                                {getCourierLabel(item.aftersalesCourierCompany || '')}:
+                                                            </span>
+                                                            {aftersalesLink ? (
+                                                                <a
+                                                                    href={aftersalesLink}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="font-mono font-bold text-slate-600 dark:text-slate-400 hover:text-primary hover:underline flex items-center gap-0.5"
+                                                                >
+                                                                    {item.aftersalesTrackingNumber}
+                                                                    <ExternalLink size={8} />
+                                                                </a>
+                                                            ) : (
+                                                                <span className="font-mono text-slate-500">{item.aftersalesTrackingNumber}</span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })}
                                         </div>
                                         <div>
                                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{isChinese ? '实付金额' : 'Total'}</p>
                                             <p className="text-sm font-black text-primary mt-1">
                                                 ¥{order.totalAmount.toLocaleString()}
-                                                {order.items.some(item => item.isRefunded) && <span className="ml-1 text-[10px] text-orange-500">(Net)</span>}
+                                                {(order.items.some(item => item.isRefunded) || order.items.some(item => item.isExchanged)) && <span className="ml-1 text-[10px] text-orange-500">(Net)</span>}
                                             </p>
                                         </div>
                                         <div>

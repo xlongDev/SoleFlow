@@ -58,6 +58,14 @@ export const exportToExcel = async (
 
     if (!options.hideRefundHeader) {
         columns.push({ header: isChinese ? '是否退款' : 'Is Refunded', key: 'isRefunded', width: 12 });
+        columns.push({ header: isChinese ? '退款原因' : 'Refund Reason', key: 'refundReason', width: 15 });
+        columns.push({ header: isChinese ? '退货成本' : 'Return Cost', key: 'returnCost', width: 12 });
+        columns.push({ header: isChinese ? '是否换货' : 'Is Exchanged', key: 'isExchanged', width: 12 });
+        columns.push({ header: isChinese ? '换货原因' : 'Exchange Reason', key: 'exchangeReason', width: 15 });
+        columns.push({ header: isChinese ? '换货后尺码' : 'Exchanged Size', key: 'exchangeSize', width: 15 });
+        columns.push({ header: isChinese ? '换货成本' : 'Exchange Cost', key: 'exchangeCost', width: 12 });
+        columns.push({ header: isChinese ? '退换货快递' : 'Aftersales Courier', key: 'aftersalesCourierCompany', width: 15 });
+        columns.push({ header: isChinese ? '退换货单号' : 'Aftersales Tracking', key: 'aftersalesTrackingNumber', width: 20 });
     }
 
     worksheet.columns = columns;
@@ -101,11 +109,21 @@ export const exportToExcel = async (
                 costPrice: item.costPrice,
                 quantity: item.quantity,
                 total: item.price * item.quantity,
-                profit: (item.price - item.costPrice) * item.quantity,
+                profit: item.isRefunded
+                    ? -Number(item.returnCost || 0) * item.quantity
+                    : (item.price - item.costPrice - Number(item.exchangeCost || 0)) * item.quantity,
                 courier: isChinese ? (courierMap[order.shipping.company] || order.shipping.company) : order.shipping.company,
                 tracking: order.shipping.trackingNumber,
                 status: isChinese ? (statusMap[effectiveStatus] || effectiveStatus) : effectiveStatus,
-                isRefunded: item.isRefunded ? (isChinese ? '是' : 'Yes') : (isChinese ? '否' : 'No')
+                isRefunded: item.isRefunded ? (isChinese ? '是' : 'Yes') : (isChinese ? '否' : 'No'),
+                refundReason: item.refundReason || '',
+                returnCost: item.returnCost || 0,
+                isExchanged: item.isExchanged ? (isChinese ? '是' : 'Yes') : (isChinese ? '否' : 'No'),
+                exchangeReason: item.exchangeReason || '',
+                exchangeSize: item.exchangeSize || '',
+                exchangeCost: item.exchangeCost || 0,
+                aftersalesCourierCompany: isChinese ? (courierMap[item.aftersalesCourierCompany || ''] || item.aftersalesCourierCompany || '') : (item.aftersalesCourierCompany || ''),
+                aftersalesTrackingNumber: item.aftersalesTrackingNumber || ''
             });
 
             // If entry has an image, embed it
@@ -221,7 +239,16 @@ export const importFromExcel = async (file: File): Promise<Order[]> => {
         const shippedAtStr = getVal(row, 'Shipment Time', '发货时间');
         const costPrice = Number(getVal(row, 'Cost Price', '拿货价')) || 0;
         const isRefundedStr = getVal(row, 'Is Refunded', '是否退款').toLowerCase();
-
+        const refundReason = getVal(row, 'Refund Reason', '退款原因');
+        const returnCost = Number(getVal(row, 'Return Cost', '退货成本')) || 0;
+        const isExchangedStr = getVal(row, 'Is Exchanged', '是否换货').toLowerCase();
+        const exchangeReason = getVal(row, 'Exchange Reason', '换货原因');
+        const exchangeSize = getVal(row, 'Exchanged Size', '换货后尺码');
+        const exchangeCost = Number(getVal(row, 'Exchange Cost', '换货成本')) || 0;
+        const aftersalesCourierRaw = getVal(row, 'Aftersales Courier', '退换货快递') || '';
+        const aftersalesCourier = courierValueMap[aftersalesCourierRaw] || aftersalesCourierRaw;
+        const aftersalesTrackingNumber = getVal(row, 'Aftersales Tracking', '退换货单号') || '';
+ 
         const item: OrderItem = {
             name: itemName,
             size: size,
@@ -229,7 +256,15 @@ export const importFromExcel = async (file: File): Promise<Order[]> => {
             costPrice: costPrice,
             quantity: quantity,
             image: rowImages.get(rowNumber) || '',
-            isRefunded: isRefundedStr === 'yes' || isRefundedStr === '是'
+            isRefunded: isRefundedStr === 'yes' || isRefundedStr === '是',
+            refundReason: refundReason,
+            returnCost: returnCost,
+            isExchanged: isExchangedStr === 'yes' || isExchangedStr === '是',
+            exchangeReason: exchangeReason,
+            exchangeSize: exchangeSize,
+            exchangeCost: exchangeCost,
+            aftersalesCourierCompany: aftersalesCourier,
+            aftersalesTrackingNumber: aftersalesTrackingNumber
         };
 
         if (orderMap.has(orderId)) {
@@ -259,9 +294,15 @@ export const importFromExcel = async (file: File): Promise<Order[]> => {
     });
 
     const result = Array.from(orderMap.values()).map(order => {
-        order.totalAmount = order.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-        order.totalCostAmount = order.items.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-        order.profit = order.totalAmount - order.totalCostAmount;
+        const activeItems = order.items.filter(item => !item.isRefunded);
+        order.totalAmount = activeItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+        order.totalCostAmount = activeItems.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
+        const aftersalesExpense = order.items.reduce((acc, item) => {
+            const retCost = item.isRefunded ? (Number(item.returnCost || 0) * item.quantity) : 0;
+            const exCost = item.isExchanged ? (Number(item.exchangeCost || 0) * item.quantity) : 0;
+            return acc + retCost + exCost;
+        }, 0);
+        order.profit = order.totalAmount - order.totalCostAmount - aftersalesExpense;
         return order;
     });
 

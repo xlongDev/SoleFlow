@@ -1,12 +1,15 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from 'sonner'
 import { DashboardLayout } from "@/layouts/DashboardLayout";
-import { Dashboard } from "@/pages/Dashboard";
-import { Orders } from "@/pages/Orders";
-import { NewOrder } from "@/pages/NewOrder";
-import { EditOrder } from "@/pages/EditOrder";
-import { CalendarPage } from "@/pages/Calendar";
-import { SettingsPage } from "@/pages/Settings";
+import { lazy, Suspense } from "react";
+
+// 使用动态导入进行代码分割
+const Dashboard = lazy(() => import("@/pages/Dashboard").then(mod => ({ default: mod.Dashboard })));
+const Orders = lazy(() => import("@/pages/Orders").then(mod => ({ default: mod.Orders })));
+const NewOrder = lazy(() => import("@/pages/NewOrder").then(mod => ({ default: mod.NewOrder })));
+const EditOrder = lazy(() => import("@/pages/EditOrder").then(mod => ({ default: mod.EditOrder })));
+const CalendarPage = lazy(() => import("@/pages/Calendar").then(mod => ({ default: mod.CalendarPage })));
+const SettingsPage = lazy(() => import("@/pages/Settings").then(mod => ({ default: mod.SettingsPage })));
 
 function App() {
   return (
@@ -31,12 +34,54 @@ function App() {
       <BrowserRouter basename="/SoleFlow/">
         <Routes>
           <Route element={<DashboardLayout />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/orders/new" element={<NewOrder />} />
-            <Route path="/orders/:id/edit" element={<EditOrder />} />
-            <Route path="/calendar" element={<CalendarPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route 
+              path="/" 
+              element={
+                <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+                  <Dashboard />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/orders" 
+              element={
+                <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+                  <Orders />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/orders/new" 
+              element={
+                <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+                  <NewOrder />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/orders/:id/edit" 
+              element={
+                <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+                  <EditOrder />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/calendar" 
+              element={
+                <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+                  <CalendarPage />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/settings" 
+              element={
+                <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+                  <SettingsPage />
+                </Suspense>
+              } 
+            />
           </Route>
         </Routes>
       </BrowserRouter>

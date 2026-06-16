@@ -36,9 +36,27 @@ interface OrderPosterProps {
     }
 }
 
-export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order, config }, ref) => {
+export const OrderPoster = forwardRef<HTMLDivElement, OrderPosterProps>(({ order: rawOrder, config }, ref) => {
     const { i18n } = useTranslation()
     const isChinese = i18n.language.startsWith('zh')
+    
+    const processedItems = rawOrder.items.map(item => {
+        if (item.isExchanged) {
+            const exchangeDisplaySize = item.exchangeSize || item.size;
+            return {
+                ...item,
+                size: exchangeDisplaySize,
+                name: `${item.name} (${isChinese ? '已换货' : 'Exchanged'})`
+            };
+        }
+        return item;
+    });
+
+    const order = {
+        ...rawOrder,
+        items: processedItems
+    };
+
     const style = config.style || 'classic'
     const activeItems = order.items.filter(item => !item.isRefunded)
     if (activeItems.length === 0) return null

@@ -31,13 +31,27 @@ export const useOrderStore = create<OrderStore>()(
                         quantity: Math.max(1, Number(item.quantity || 1)),
                         category: item.category || 'shoes',
                         isRefunded: !!item.isRefunded,
-                        refundReason: item.refundReason
+                        refundReason: item.refundReason,
+                        isExchanged: !!item.isExchanged,
+                        exchangeReason: item.exchangeReason,
+                        exchangeSize: item.exchangeSize,
+                        returnCost: Number(item.returnCost || 0),
+                        exchangeCost: Number(item.exchangeCost || 0),
+                        aftersalesCourierCompany: item.aftersalesCourierCompany || '',
+                        aftersalesTrackingNumber: item.aftersalesTrackingNumber || '',
+                        originalSize: item.originalSize,
+                        compressedSize: item.compressedSize
                     }))
                     : []
                 const activeItems = safeItems.filter(item => !item.isRefunded)
                 const totalAmount = activeItems.reduce((acc, item) => acc + (item.price * item.quantity), 0)
                 const totalCostAmount = activeItems.reduce((acc, item) => acc + ((item.costPrice || 0) * item.quantity), 0)
-                const profit = totalAmount - totalCostAmount
+                const aftersalesExpense = safeItems.reduce((acc, item) => {
+                    const retCost = item.isRefunded ? (Number(item.returnCost || 0) * item.quantity) : 0
+                    const exCost = item.isExchanged ? (Number(item.exchangeCost || 0) * item.quantity) : 0
+                    return acc + retCost + exCost
+                }, 0)
+                const profit = totalAmount - totalCostAmount - aftersalesExpense
                 return {
                     ...order,
                     customer: order.customer || { name: '', phone: '', address: '' },

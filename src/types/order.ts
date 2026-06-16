@@ -12,6 +12,15 @@ export interface OrderItem {
     category?: ItemCategory;
     isRefunded?: boolean;
     refundReason?: string;
+    isExchanged?: boolean;
+    exchangeReason?: string;
+    exchangeSize?: string;
+    returnCost?: number;
+    exchangeCost?: number;
+    aftersalesCourierCompany?: string;
+    aftersalesTrackingNumber?: string;
+    originalSize?: number;
+    compressedSize?: number;
 }
 
 export interface Order {
